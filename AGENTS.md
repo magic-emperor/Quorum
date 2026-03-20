@@ -4,38 +4,46 @@ ATLAS (Autonomous Team for Large-scale Application Systems) is an orchestration 
 
 **Phase 1 MVP Status:** Classifier, Orchestrator, Backend Architect, Backend Validator, Critic, Nervous System, 4 Skills, 2 Commands
 
-## Available Agents (All 12)
+## Available Agents (Phase 1 + 2)
+
+| Agent | Purpose | When to Use |
+|-------|---------|-------------|
+| atlas-orchestrator | Master coordinator for the full ATLAS pipeline | Called by `/atlas-new` and `/atlas-enhance` only |
+| atlas-classifier | Detects project complexity (SIMPLE vs COMPLEX) | First step in every ATLAS run |
+| atlas-critic | Evidence-only assumption interceptor | After every agent output, throughout pipeline |
+| atlas-backend-architect | Designs complete backend before any code written | Phase 1 of complex projects |
+| atlas-backend-validator | Challenges backend architecture in confidence loop | Loops with architect until 100% confidence |
+| atlas-nervous-system | Maintains permanent project memory across sessions | End of every session, git hooks |
+| atlas-design-architect | Designs frontend UI/UX with 4 visual variations | Phase 2 |
+| atlas-design-validator | Confirms design is technically buildable | Loops with design architect until 100% |
+| atlas-frontend-builder | Builds frontend from approved design (v0/Lovable/Claude) | Phase 3 — parallel with backend build |
+
+## Upcoming Agents (Phase 3)
 
 | Agent | Purpose | Phase |
 |-------|---------|-------|
-| atlas-orchestrator | Master coordinator — routes work, manages checkpoints | All |
-| atlas-classifier | Detects SIMPLE vs COMPLEX | Phase 0 |
-| atlas-nervous-system | Permanent project memory across sessions | All |
-| atlas-critic | Evidence-only assumption interceptor | All |
-| atlas-backend-architect | Designs complete backend before any code written | Phase 1 |
-| atlas-backend-validator | Challenges backend in confidence loop until 100% | Phase 1 |
-| atlas-design-architect | Designs frontend with 4 visual variations + v0 prompts | Phase 2 |
-| atlas-design-validator | Validates design is technically buildable | Phase 2 |
-| atlas-frontend-builder | Builds frontend from approved design | Phase 3 |
-| atlas-integration | Reconciles frontend/backend API contract mismatches | Phase 4 |
-| atlas-testing | E2E testing, bug registry, 80% coverage gate | Phase 5 |
-| atlas-scaling | Cost projections + bottleneck analysis at 1K/10K/100K/1M users | Phase 6 |
+| atlas-integration | Connects frontend and backend API contracts | Phase 3 |
+| atlas-testing | End-to-end browser testing with bug registry | Phase 3 |
+| atlas-scaling | Cost and bottleneck analysis at different user scales | Phase 3 |
 
 ## Available Skills
 
 | Skill | Purpose |
 |-------|---------|
-| `skills/atlas-project-memory/` | How to read/write .atlas/ efficiently |
-| `skills/atlas-foundation-mode/` | Seed .atlas/ for new projects |
-| `skills/atlas-loop-prevention/` | Rules for all confidence loops |
-| `skills/atlas-plan-management/` | Surgical plan.md updates, interrupt processing |
+| `skills/atlas-project-memory/` | How to read/write `.atlas/` efficiently (99% cheaper navigation) |
+| `skills/atlas-foundation-mode/` | Seeds `.atlas/` for new projects — runs once, never again |
+| `skills/atlas-loop-prevention/` | Rules for all confidence loops (max rounds, escalation triggers) |
+| `skills/atlas-plan-management/` | Surgical `plan.md` updates + interrupt queue processing |
+| `skills/atlas-function-registry/` | Function registry schema + navigation protocol |
 
 ## Available Commands
 
 | Command | Purpose |
 |---------|---------|
 | `/atlas-new` | Start new feature or application from scratch |
+| `/atlas-enhance` | Modify or extend an existing feature (reads context automatically) |
 | `/atlas-status` | Check execution state, decisions, token usage |
+| `/atlas-sync` | Force re-index project after manual changes outside ATLAS |
 
 ## How ATLAS Works
 

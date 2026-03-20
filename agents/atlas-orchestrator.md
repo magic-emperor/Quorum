@@ -113,8 +113,8 @@ Step 5: HUMAN CHECKPOINT A
 ```
 Step 1: Call atlas-design-architect
   Task: atlas-design-architect
-  Pass: project description + approved architecture-proposal.md + stack.json
-  Receive: design-proposal.md with 4 variations + v0 prompts
+  Pass: project description + approved architecture + stack.json
+  Receive: design-proposal.md with 4 variations
 
 Step 2: Start design confidence loop
   Read skill: atlas-loop-prevention
@@ -129,6 +129,7 @@ Step 3: HUMAN CHECKPOINT B
 
     Here are your design options:
     [4 options each with: name, mood, colors, layout description]
+    [v0 preview links if v0_enabled in config]
 
     Type: SELECT [1/2/3/4] or describe changes"
 
@@ -143,19 +144,21 @@ Step 3: HUMAN CHECKPOINT B
 ```
 Launch simultaneously via Task:
   Task A: atlas-backend-architect (builds backend code)
-    Pass: approved architecture-proposal.md + decisions.json + stack.json
+    Pass: approved architecture + decisions.json + stack.json
+    Alongside: atlas-critic monitoring (called by backend architect)
     Output: working backend code + api-contract.md
 
   Task B: atlas-frontend-builder
-    Pass: approved design-proposal.md + decisions.json + stack.json
+    Pass: approved design + decisions.json + stack.json
+    Alongside: atlas-critic monitoring (called by frontend builder)
     Output: working frontend code + frontend-api-calls.md
 
 During execution:
   Check interrupt-queue.json at every agent checkpoint
   Process interrupts per atlas-plan-management skill
-  Update plan.md each significant step
+  Update plan.md every significant step
 
-On both complete:
+On both tasks complete:
   Create rollback point: rp_003_build_complete
   Update plan.md Phase 3 → COMPLETE
 ```
