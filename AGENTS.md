@@ -4,7 +4,7 @@ ATLAS (Autonomous Team for Large-scale Application Systems) is an orchestration 
 
 **Phase 1 MVP Status:** Classifier, Orchestrator, Backend Architect, Backend Validator, Critic, Nervous System, 4 Skills, 2 Commands
 
-## Available Agents (Phase 1 MVP)
+## Available Agents (Phase 1 + 2)
 
 | Agent | Purpose | When to Use |
 |-------|---------|-------------|
@@ -14,14 +14,14 @@ ATLAS (Autonomous Team for Large-scale Application Systems) is an orchestration 
 | atlas-backend-architect | Designs complete backend before any code written | Phase 1 of complex projects |
 | atlas-backend-validator | Challenges backend architecture in confidence loop | Loops with architect until 100% confidence |
 | atlas-nervous-system | Maintains permanent project memory across sessions | End of every session, git hooks |
+| atlas-design-architect | Designs frontend UI/UX with 4 visual variations | Phase 2 |
+| atlas-design-validator | Confirms design is technically buildable | Loops with design architect until 100% |
+| atlas-frontend-builder | Builds frontend from approved design (v0/Lovable/Claude) | Phase 3 — parallel with backend build |
 
-## Upcoming Agents (Phase 2-3)
+## Upcoming Agents (Phase 3)
 
 | Agent | Purpose | Phase |
 |-------|---------|-------|
-| atlas-design-architect | Designs UI/UX with 4 visual variations | Phase 2 |
-| atlas-design-validator | Confirms design is technically buildable | Phase 2 |
-| atlas-frontend-builder | Builds frontend (v0/Lovable/Claude) | Phase 2 |
 | atlas-integration | Connects frontend and backend API contracts | Phase 3 |
 | atlas-testing | End-to-end browser testing with bug registry | Phase 3 |
 | atlas-scaling | Cost and bottleneck analysis at different user scales | Phase 3 |
@@ -30,17 +30,20 @@ ATLAS (Autonomous Team for Large-scale Application Systems) is an orchestration 
 
 | Skill | Purpose |
 |-------|---------|
-| `skills/atlas-project-memory/` | How to read/write .atlas/ efficiently |
-| `skills/atlas-foundation-mode/` | Seed .atlas/ for new projects |
-| `skills/atlas-loop-prevention/` | Rules for all confidence loops |
-| `skills/atlas-plan-management/` | Surgical plan.md updates, interrupt processing |
+| `skills/atlas-project-memory/` | How to read/write `.atlas/` efficiently (99% cheaper navigation) |
+| `skills/atlas-foundation-mode/` | Seeds `.atlas/` for new projects — runs once, never again |
+| `skills/atlas-loop-prevention/` | Rules for all confidence loops (max rounds, escalation triggers) |
+| `skills/atlas-plan-management/` | Surgical `plan.md` updates + interrupt queue processing |
+| `skills/atlas-function-registry/` | Function registry schema + navigation protocol |
 
 ## Available Commands
 
 | Command | Purpose |
 |---------|---------|
 | `/atlas-new` | Start new feature or application from scratch |
+| `/atlas-enhance` | Modify or extend an existing feature (reads context automatically) |
 | `/atlas-status` | Check execution state, decisions, token usage |
+| `/atlas-sync` | Force re-index project after manual changes outside ATLAS |
 
 ## How ATLAS Works
 
