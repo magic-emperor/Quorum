@@ -1,0 +1,70 @@
+{
+  "_INSTRUCTIONS": "Copy this file to your project root as 'atlas.config.json'. Fill in the 'project' section. Adjust models and budgets as needed.",
+  "_TIERS": "starter = Claude only (cheapest, recommended for most). standard = Claude + GPT-4o-mini for Critic. professional = Claude + GPT-4o + Gemini for 500K+ line codebases.",
+
+  "version": "1.0",
+  "tier": "starter",
+
+  "models": {
+    "_note": "Change individual model strings to override per-agent. Tier setting above applies defaults.",
+    "atlas-orchestrator":       "claude-opus-4-6",
+    "atlas-classifier":         "claude-haiku-4-5-20251001",
+    "atlas-critic":             "claude-haiku-4-5-20251001",
+    "atlas-backend-architect":  "claude-sonnet-4-6",
+    "atlas-backend-validator":  "claude-sonnet-4-6",
+    "atlas-design-architect":   "claude-sonnet-4-6",
+    "atlas-design-validator":   "claude-haiku-4-5-20251001",
+    "atlas-frontend-builder":   "claude-sonnet-4-6",
+    "atlas-integration":        "claude-sonnet-4-6",
+    "atlas-testing":            "claude-sonnet-4-6",
+    "atlas-scaling":            "claude-haiku-4-5-20251001",
+    "atlas-nervous-system":     "claude-haiku-4-5-20251001"
+  },
+
+  "frontend_builder": {
+    "_note": "Set provider to 'v0' and add V0_API_KEY env var to use v0 for frontend generation.",
+    "provider": "claude",
+    "v0_enabled": false,
+    "lovable_enabled": false
+  },
+
+  "token_budgets": {
+    "_note": "Per-phase limits. Orchestrator warns at 75%, flags at 90%.",
+    "phase_0_foundation":          5000,
+    "phase_1_architecture":        40000,
+    "phase_2_design":              25000,
+    "phase_3_build_per_module":    80000,
+    "phase_4_integration":         30000,
+    "phase_5_testing":             60000,
+    "phase_6_scaling":             15000,
+    "critic_per_intervention":      3000,
+    "session_total_default":       300000
+  },
+
+  "loop_limits": {
+    "_note": "Maximum rounds before escalating to human. Do not increase beyond spec values.",
+    "architect_validator_max_rounds": 3,
+    "design_loop_max_rounds":         3,
+    "bug_fix_max_attempts":           2,
+    "integration_max_rounds":         2,
+    "progress_threshold_percent":     5,
+    "semantic_similarity_threshold":  0.85
+  },
+
+  "checkpoints": {
+    "_note": "Set require_human_* to false to auto-approve (not recommended for production).",
+    "require_human_phase_1":       true,
+    "require_human_phase_2":       true,
+    "require_human_phase_5":       true,
+    "prompt_scaling_phase_6":      true,
+    "auto_proceed_simple_projects": true
+  },
+
+  "project": {
+    "_note": "Fill these in for your project. project_hash is auto-generated on first run.",
+    "name": "",
+    "description": "",
+    "team_size": 1,
+    "project_hash": ""
+  }
+}
