@@ -4,27 +4,22 @@ ATLAS (Autonomous Team for Large-scale Application Systems) is an orchestration 
 
 **Phase 1 MVP Status:** Classifier, Orchestrator, Backend Architect, Backend Validator, Critic, Nervous System, 4 Skills, 2 Commands
 
-## Available Agents (Phase 1 MVP)
-
-| Agent | Purpose | When to Use |
-|-------|---------|-------------|
-| atlas-orchestrator | Master coordinator for the full ATLAS pipeline | Called by `/atlas-new` and `/atlas-enhance` only |
-| atlas-classifier | Detects project complexity (SIMPLE vs COMPLEX) | First step in every ATLAS run |
-| atlas-critic | Evidence-only assumption interceptor | After every agent output, throughout pipeline |
-| atlas-backend-architect | Designs complete backend before any code written | Phase 1 of complex projects |
-| atlas-backend-validator | Challenges backend architecture in confidence loop | Loops with architect until 100% confidence |
-| atlas-nervous-system | Maintains permanent project memory across sessions | End of every session, git hooks |
-
-## Upcoming Agents (Phase 2-3)
+## Available Agents (All 12)
 
 | Agent | Purpose | Phase |
 |-------|---------|-------|
-| atlas-design-architect | Designs UI/UX with 4 visual variations | Phase 2 |
-| atlas-design-validator | Confirms design is technically buildable | Phase 2 |
-| atlas-frontend-builder | Builds frontend (v0/Lovable/Claude) | Phase 2 |
-| atlas-integration | Connects frontend and backend API contracts | Phase 3 |
-| atlas-testing | End-to-end browser testing with bug registry | Phase 3 |
-| atlas-scaling | Cost and bottleneck analysis at different user scales | Phase 3 |
+| atlas-orchestrator | Master coordinator — routes work, manages checkpoints | All |
+| atlas-classifier | Detects SIMPLE vs COMPLEX | Phase 0 |
+| atlas-nervous-system | Permanent project memory across sessions | All |
+| atlas-critic | Evidence-only assumption interceptor | All |
+| atlas-backend-architect | Designs complete backend before any code written | Phase 1 |
+| atlas-backend-validator | Challenges backend in confidence loop until 100% | Phase 1 |
+| atlas-design-architect | Designs frontend with 4 visual variations + v0 prompts | Phase 2 |
+| atlas-design-validator | Validates design is technically buildable | Phase 2 |
+| atlas-frontend-builder | Builds frontend from approved design | Phase 3 |
+| atlas-integration | Reconciles frontend/backend API contract mismatches | Phase 4 |
+| atlas-testing | E2E testing, bug registry, 80% coverage gate | Phase 5 |
+| atlas-scaling | Cost projections + bottleneck analysis at 1K/10K/100K/1M users | Phase 6 |
 
 ## Available Skills
 
