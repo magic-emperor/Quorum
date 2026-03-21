@@ -4,7 +4,7 @@ import chalk from 'chalk'
 import ora from 'ora'
 import inquirer from 'inquirer'
 import { ATLASEngine } from '@atlas/core'
-import type { Checkpoint } from '@atlas/core'
+import type { Checkpoint, ATLASRunOptions } from '@atlas/core'
 import { discoverProviderModels, envVarToProvider, providerToEnvVar } from '@atlas/core'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import path from 'path'
@@ -265,25 +265,245 @@ keyCmd
     console.log(chalk.dim(`  (Set to empty string — will be excluded even if ${envVar} is in your system environment)\n`))
   })
 
+// ── atlas init ───────────────────────────────────────────────────────────────
+program
+  .command('init')
+  .description('Initialize ATLAS in this project — creates .atlas/ folder and goal.md')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--auto', 'Skip all prompts')
+  .action(async (opts: { dir: string; auto?: boolean }) => {
+    await runATLAS('init', undefined, opts)
+  })
+
+// ── atlas fast ────────────────────────────────────────────────────────────────
+program
+  .command('fast <description>')
+  .description('Quick task — no full pipeline (< 5 file changes)')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--no-save', 'Do not save to .atlas/task.md')
+  .action(async (description: string, opts: { dir: string; save?: boolean }) => {
+    await runATLAS('fast', description, { ...opts, noSave: opts.save === false })
+  })
+
+// ── atlas next ────────────────────────────────────────────────────────────────
+program
+  .command('next')
+  .description('Auto-detect what to do next based on project state')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (opts: { dir: string }) => {
+    await runATLAS('next', undefined, opts)
+  })
+
+// ── atlas pause ───────────────────────────────────────────────────────────────
+program
+  .command('pause')
+  .description('Cleanly pause mid-session — saves state for resumption')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (opts: { dir: string }) => {
+    await runATLAS('pause', undefined, opts)
+  })
+
+// ── atlas resume ──────────────────────────────────────────────────────────────
+program
+  .command('resume')
+  .description('Resume a paused session from saved state')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--auto', 'Auto-approve resume without confirmation')
+  .action(async (opts: { dir: string; auto?: boolean }) => {
+    await runATLAS('resume', undefined, opts)
+  })
+
+// ── atlas doctor ──────────────────────────────────────────────────────────────
+program
+  .command('doctor')
+  .description('Check ATLAS installation health and fix issues')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--repair', 'Auto-fix repairable issues')
+  .action(async (opts: { dir: string; repair?: boolean }) => {
+    await runATLAS('doctor', undefined, { ...opts, extra: { repair: String(!!opts.repair) } })
+  })
+
+// ── atlas discuss ─────────────────────────────────────────────────────────────
+program
+  .command('discuss <feature>')
+  .description('Gather context and questions before planning — prevents wrong assumptions')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (feature: string, opts: { dir: string }) => {
+    await runATLAS('discuss', feature, opts)
+  })
+
+// ── atlas verify ──────────────────────────────────────────────────────────────
+program
+  .command('verify')
+  .description('Interactive UAT — walk through each deliverable and confirm it works')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--auto', 'Auto-pass all items (for CI)')
+  .action(async (opts: { dir: string; auto?: boolean }) => {
+    await runATLAS('verify', undefined, opts)
+  })
+
+// ── atlas ship ────────────────────────────────────────────────────────────────
+program
+  .command('ship')
+  .description('Create pull request from verified completed work')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--draft', 'Create as draft PR')
+  .option('--auto', 'Skip confirmation')
+  .action(async (opts: { dir: string; draft?: boolean; auto?: boolean }) => {
+    await runATLAS('ship', undefined, { ...opts, extra: { draft: String(!!opts.draft) } })
+  })
+
+// ── atlas review ──────────────────────────────────────────────────────────────
+program
+  .command('review [path]')
+  .description('Run code + security review on uncommitted changes')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (targetPath: string | undefined, opts: { dir: string }) => {
+    await runATLAS('review', targetPath, opts)
+  })
+
+// ── atlas map ─────────────────────────────────────────────────────────────────
+program
+  .command('map [area]')
+  .description('Let agents read and summarize your existing codebase')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (area: string | undefined, opts: { dir: string }) => {
+    await runATLAS('map', area ?? 'src', opts)
+  })
+
+// ── atlas debug ───────────────────────────────────────────────────────────────
+program
+  .command('debug <description>')
+  .description('Systematic debugging — traces root cause and proposes fix')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--auto', 'Auto-apply proposed fix without confirmation')
+  .action(async (description: string, opts: { dir: string; auto?: boolean }) => {
+    await runATLAS('debug', description, opts)
+  })
+
+// ── atlas session-report ──────────────────────────────────────────────────────
+program
+  .command('session-report')
+  .description('Generate human-readable summary of this session')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (opts: { dir: string }) => {
+    await runATLAS('session-report', undefined, opts)
+  })
+
+// ── atlas seed ────────────────────────────────────────────────────────────────
+program
+  .command('seed <idea>')
+  .description('Capture a future idea to surface at the right milestone')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--trigger <condition>', 'When to surface this idea', 'next milestone')
+  .action(async (idea: string, opts: { dir: string; trigger?: string }) => {
+    await runATLAS('seed', idea, { ...opts, extra: { trigger: opts.trigger ?? 'next milestone' } })
+  })
+
+// ── atlas backlog ─────────────────────────────────────────────────────────────
+program
+  .command('backlog [subcommand] [description]')
+  .description('Manage backlog: atlas backlog [add|list|promote] [text/number]')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--priority <level>', 'Priority: high | medium | low', 'medium')
+  .action(async (subcommand: string = 'list', description: string = '', opts: { dir: string; priority?: string }) => {
+    await runATLAS('backlog', description, { ...opts, subcommand, extra: { priority: opts.priority ?? 'medium' } })
+  })
+
+// ── atlas note ────────────────────────────────────────────────────────────────
+program
+  .command('note <text>')
+  .description('Capture a quick note to .atlas/NOTES.md')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (text: string, opts: { dir: string }) => {
+    await runATLAS('note', text, opts)
+  })
+
+// ── atlas agents ──────────────────────────────────────────────────────────────
+program
+  .command('agents')
+  .description('List all agents with their current model assignments')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (opts: { dir: string }) => {
+    await runATLAS('agents', undefined, opts)
+  })
+
+// ── atlas profile ─────────────────────────────────────────────────────────────
+program
+  .command('profile <name>')
+  .description('Switch model profile: fast | balanced | quality')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .action(async (name: string, opts: { dir: string }) => {
+    await runATLAS('profile', name, opts)
+  })
+
+// ── atlas help ────────────────────────────────────────────────────────────────
+program
+  .command('help')
+  .description('Show all commands with descriptions')
+  .action(() => {
+    printBanner()
+    console.log(chalk.bold('\nCOMMANDS\n'))
+    const commands = [
+      ['init', 'Initialize ATLAS in this project'],
+      ['new <description>', 'Build new feature from scratch (full pipeline)'],
+      ['enhance <description>', 'Modify existing feature (targeted)'],
+      ['fast <description>', 'Quick task — no full pipeline (< 5 files)'],
+      ['next', 'Auto-detect what to do next'],
+      ['pause / resume', 'Save and restore mid-session state'],
+      ['doctor [--repair]', 'Health check and auto-fix issues'],
+      ['discuss <feature>', 'Gather context before planning (prevents mistakes)'],
+      ['verify', 'Interactive UAT — confirm each deliverable works'],
+      ['ship [--draft]', 'Create pull request from completed work'],
+      ['review [path]', 'Code + security review of uncommitted changes'],
+      ['map [area]', 'Agents read and summarize your codebase'],
+      ['debug <description>', 'Systematic debugging — find and fix root cause'],
+      ['session-report', 'Summary of what happened this session'],
+      ['seed <idea>', 'Capture future idea for later (non-disruptive)'],
+      ['backlog [add|list|promote]', 'Manage items outside active tasks'],
+      ['note <text>', 'Quick note to .atlas/NOTES.md'],
+      ['agents', 'List all agents and their model assignments'],
+      ['profile <fast|balanced|quality>', 'Switch model quality tier'],
+      ['key add/list/remove', 'Manage API keys and auto-discover models'],
+      ['status', 'Current state, routing, costs'],
+      ['rollback [point]', 'Return to previous rollback point'],
+      ['sync', 'Re-index project after manual changes'],
+    ]
+    commands.forEach(([cmd, desc]) => {
+      console.log(`  ${chalk.cyan(('atlas ' + cmd!).padEnd(38))} ${chalk.white(desc!)}`)
+    })
+    console.log(chalk.dim('\n  atlas <command> --help for command-specific options\n'))
+  })
+
 // ── Runner ────────────────────────────────────────────────────────────────────
 async function runATLAS(
   command: string,
   description: string | undefined,
-  opts: { dir?: string; config?: string; checkpoints?: boolean }
+  opts: { dir?: string; config?: string; checkpoints?: boolean; auto?: boolean; noSave?: boolean; subcommand?: string; extra?: Record<string, string> }
 ): Promise<void> {
   const projectDir = path.resolve(opts.dir ?? process.cwd())
   const spinner = ora({ color: 'cyan' })
 
   printBanner()
 
-  // Fail fast if no API key at all
-  if (!process.env['ANTHROPIC_API_KEY'] && !process.env['OPENAI_API_KEY']) {
+  // Commands that don't need API keys
+  const noKeyCommands = ['init', 'next', 'pause', 'resume', 'doctor', 'verify',
+    'session-report', 'seed', 'backlog', 'note', 'agents', 'profile']
+  const needsKey = !noKeyCommands.includes(command)
+
+  // Fail fast if no API key at all (and command needs one)
+  if (needsKey) {
+    const knownKeyEnvVars = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_AI_API_KEY',
+      'GROQ_API_KEY', 'DEEPSEEK_API_KEY', 'MISTRAL_API_KEY']
+    const hasEnvKey = knownKeyEnvVars.some(k => process.env[k])
     const cfgPath = opts.config ?? path.join(projectDir, 'atlas.config.json')
-    if (!existsSync(cfgPath)) {
+    const hasCfgKey = existsSync(cfgPath)
+    if (!hasEnvKey && !hasCfgKey) {
       console.error(chalk.red('\n  ✗ No API keys detected.\n'))
-      console.error(chalk.yellow('  Set at minimum:'))
-      console.error(chalk.white('    export ANTHROPIC_API_KEY=your-key'))
-      console.error(chalk.gray('    https://console.anthropic.com\n'))
+      console.error(chalk.yellow('  Add a key:'))
+      console.error(chalk.white('    atlas key add GOOGLE_AI_API_KEY=your-key  (free tier)'))
+      console.error(chalk.white('    atlas key add GROQ_API_KEY=your-key        (free)'))
+      console.error(chalk.gray('    https://aistudio.google.com  (Google AI Studio)\n'))
       process.exit(1)
     }
   }
@@ -295,9 +515,13 @@ async function runATLAS(
 
   try {
     await engine.run({
-      command: command as 'new' | 'enhance' | 'status' | 'rollback' | 'sync',
+      command: command as ATLASRunOptions['command'],
       description,
       projectDir,
+      auto: opts.auto,
+      noSave: opts.noSave,
+      subcommand: opts.subcommand,
+      extra: opts.extra,
 
       onProgress: (message: string) => {
         if (message.startsWith('\n──')) {

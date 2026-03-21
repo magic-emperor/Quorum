@@ -6,6 +6,15 @@ export { ToolExecutor } from './tool-executor.js'
 export { buildProvider, detectAvailableProviders, buildRoutingTable } from './providers/index.js'
 export { discoverProviderModels, envVarToProvider, providerToEnvVar } from './providers/index.js'
 export type { DiscoveryResult, DiscoveredTiers } from './providers/index.js'
+
+// Phase 3 command handlers (for CLI to import directly by name)
+export {
+  runInit, runFast, runNext, runPause, runResume,
+  runDoctor, runDiscuss, runVerify, runShip, runReview,
+  runMap, runDebug, runSessionReport, runSeed, runBacklog, runNote,
+  runAgents, runProfile
+} from './commands/index.js'
+
 export type {
   ATLASConfig,
   ATLASRunOptions,
@@ -24,5 +33,18 @@ export type {
   Bug,
   FunctionEntry,
   ClassificationResult,
-  ProjectComplexity
+  ProjectComplexity,
+  // Phase 3 result types
+  DoctorReport,
+  DoctorCheck,
+  DiscussResult,
+  VerifyResult,
+  VerifyItem,
+  SessionReport,
+  HandoffState,
+  AgentInfo,
+  MapResult,
+  Seed,
+  BacklogItem,
+  MilestoneState
 } from './types.js'

@@ -148,12 +148,146 @@ export interface ToolResult {
 }
 
 export interface ATLASRunOptions {
-  command: 'new' | 'enhance' | 'status' | 'rollback' | 'sync'
+  command: 'new' | 'enhance' | 'status' | 'sync' | 'rollback' |
+           'init' | 'fast' | 'next' | 'pause' | 'resume' |
+           'doctor' | 'discuss' | 'verify' | 'ship' | 'review' |
+           'map' | 'debug' | 'session-report' | 'seed' | 'backlog' |
+           'note' | 'milestone' | 'plan-preview' | 'agents' | 'profile'
   description?: string
   projectDir: string
   onCheckpoint?: (checkpoint: Checkpoint) => Promise<string>
   onProgress?: (message: string) => void
   onAgentOutput?: (agent: string, output: string) => void
+  // New flags
+  auto?: boolean           // skip all human checkpoints
+  verbose?: boolean        // debug output
+  json?: boolean           // machine-readable output
+  maxCost?: number         // budget cap USD
+  quality?: 'fast' | 'balanced' | 'max'
+  modelOverride?: string   // one-off model override
+  agentOverride?: string   // run single specific agent
+  noSave?: boolean         // don't persist session
+  fromPr?: string          // load context from PR number/URL
+  worktree?: string        // isolate in git worktree
+  subcommand?: string      // for commands with subcommands (backlog add/list)
+  extra?: Record<string, string> // extra command-specific options
+}
+
+// ─── Phase 3: Command Result Types ──────────────────────────────────────────
+
+export interface DoctorReport {
+  overall: 'healthy' | 'degraded' | 'broken'
+  checks: DoctorCheck[]
+  repaired: string[]
+  requires_manual_fix: string[]
+}
+
+export interface DoctorCheck {
+  name: string
+  status: 'pass' | 'fail' | 'warn' | 'skip'
+  message: string
+  fix?: string   // auto-fixable description
+  action?: string // manual action required
+}
+
+export interface DiscussResult {
+  feature: string
+  questions_asked: string[]
+  decisions_captured: string[]
+  output_file: string
+  ready_to_plan: boolean
+}
+
+export interface VerifyResult {
+  deliverables: VerifyItem[]
+  passed: number
+  failed: number
+  skipped: number
+  ready_to_ship: boolean
+}
+
+export interface VerifyItem {
+  id: string
+  description: string
+  status: 'pass' | 'fail' | 'skip' | 'pending'
+  human_response?: string
+  notes?: string
+}
+
+export interface SessionReport {
+  session_id: string
+  date: string
+  duration_minutes: number
+  tasks_created: string[]
+  tasks_completed: string[]
+  decisions_made: number
+  files_changed: string[]
+  agents_used: string[]
+  cost_estimate: string
+  summary: string
+  next_recommended: string
+}
+
+export interface HandoffState {
+  session_id: string
+  paused_at: string
+  command: string
+  description: string
+  current_phase: string
+  current_step: string
+  completed_steps: string[]
+  remaining_steps: string[]
+  context_snapshot: string
+  resume_instruction: string
+}
+
+export interface AgentInfo {
+  name: string
+  description: string
+  model: string
+  provider: string
+  tools: string[]
+  phase: string
+  status: 'active' | 'idle' | 'disabled'
+}
+
+export interface MapResult {
+  area: string
+  files_scanned: number
+  modules_found: string[]
+  architecture_summary: string
+  key_patterns: string[]
+  tech_stack_confirmed: Partial<TechStack>
+  output_file: string
+}
+
+export interface Seed {
+  id: string
+  idea: string
+  trigger: string
+  created_date: string
+  created_session: string
+  status: 'pending' | 'surfaced' | 'acted_on' | 'dismissed'
+}
+
+export interface BacklogItem {
+  id: string
+  description: string
+  added_date: string
+  added_session: string
+  priority?: 'high' | 'medium' | 'low'
+  status: 'backlog' | 'promoted' | 'dismissed'
+  promoted_to?: string
+}
+
+export interface MilestoneState {
+  name: string
+  status: 'active' | 'complete' | 'archived'
+  started_date: string
+  completed_date?: string
+  task_ids: string[]
+  success_criteria: string[]
+  criteria_met: boolean[]
 }
 
 export interface Checkpoint {
@@ -228,6 +362,10 @@ export interface Bug {
   fix_applied?: string
   session: string
   found_by: string
+  // Pattern matching fields (used by debug and review agents)
+  pattern?: string
+  category?: string
+  prevention_check?: string
 }
 
 export interface FunctionEntry {

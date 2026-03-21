@@ -19,6 +19,22 @@ import { PlanManager } from './memory/plan-manager.js'
 import { SessionBriefManager } from './memory/session-brief.js'
 import { ToolExecutor } from './tool-executor.js'
 
+// Phase 3 command handlers
+import { runInit } from './commands/init.js'
+import { runFast } from './commands/fast.js'
+import { runNext } from './commands/next.js'
+import { runPause, runResume } from './commands/pause-resume.js'
+import { runDoctor } from './commands/doctor.js'
+import { runDiscuss } from './commands/discuss.js'
+import { runVerify } from './commands/verify.js'
+import { runShip } from './commands/ship.js'
+import { runReview } from './commands/review.js'
+import { runMap } from './commands/map.js'
+import { runDebug } from './commands/debug.js'
+import { runSessionReport } from './commands/session-report.js'
+import { runSeed, runBacklog, runNote } from './commands/seed-backlog-note.js'
+import { runAgents, runProfile } from './commands/agents-profile.js'
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
@@ -99,12 +115,75 @@ export class ATLASEngine {
 
     onProgress?.(`ATLAS — session ${this.sessionId}`)
 
+    // Show session notes from routing table (active providers etc.)
+    for (const note of this.routingTable.session_notes) {
+      onProgress?.(`  ${note}`)
+    }
+
     switch (command) {
       case 'new':     await this.runNew(description ?? '', options); break
       case 'enhance': await this.runEnhance(description ?? '', options); break
       case 'status':  await this.runStatus(options); break
       case 'sync':    await this.runSync(options); break
       case 'rollback':onProgress?.('Rollback not yet implemented.'); break
+
+      // ─── Phase 3 commands ───────────────────────────────────────────
+      case 'init':
+        await runInit(this.projectDir, options); break
+
+      case 'fast':
+        await runFast(description ?? '', this.projectDir, this.agentsDir, this.routingTable, options); break
+
+      case 'next':
+        await runNext(this.projectDir, options); break
+
+      case 'pause':
+        await runPause(this.projectDir, options); break
+
+      case 'resume':
+        await runResume(this.projectDir, options); break
+
+      case 'doctor':
+        await runDoctor(this.projectDir, options); break
+
+      case 'discuss':
+        await runDiscuss(description ?? '', this.projectDir, this.agentsDir, this.routingTable, options); break
+
+      case 'verify':
+        await runVerify(this.projectDir, options); break
+
+      case 'ship':
+        await runShip(this.projectDir, this.agentsDir, this.routingTable, options); break
+
+      case 'review':
+        await runReview(this.projectDir, this.agentsDir, this.routingTable, options); break
+
+      case 'map':
+        await runMap(this.projectDir, this.agentsDir, this.routingTable, options); break
+
+      case 'debug':
+        await runDebug(description ?? '', this.projectDir, this.agentsDir, this.routingTable, options); break
+
+      case 'session-report':
+        await runSessionReport(this.projectDir, options); break
+
+      case 'seed':
+        await runSeed(description ?? '', this.projectDir, options); break
+
+      case 'backlog':
+        await runBacklog(options.subcommand ?? 'list', description ?? '', this.projectDir, options); break
+
+      case 'note':
+        await runNote(description ?? '', this.projectDir, options); break
+
+      case 'agents':
+        await runAgents(this.projectDir, options, this.routingTable); break
+
+      case 'profile':
+        await runProfile(description ?? '', this.projectDir, options); break
+
+      default:
+        onProgress?.(`Unknown command: ${command}`)
     }
   }
 
