@@ -1,12 +1,13 @@
 {
   "version": "2.0",
   "simplicity_mode": true,
-  "_README": "Copy this file to atlas.config.json and fill in your API keys. atlas.config.json is gitignored — never commit it.",
+  "_README": "Add your API key(s) below. ATLAS auto-detects what you have and routes each agent to the best model available. You only need ONE key to get started.",
+
   "api_keys": {
-    "_note": "Paste keys here OR set as env vars (env vars take priority). atlas.config.json is gitignored.",
+    "_note": "Paste key(s) here OR set as environment variables. Env vars take priority.",
     "ANTHROPIC_API_KEY": "",
-    "GOOGLE_AI_API_KEY": "",
     "OPENAI_API_KEY": "",
+    "GOOGLE_AI_API_KEY": "",
     "GROQ_API_KEY": "",
     "DEEPSEEK_API_KEY": "",
     "MISTRAL_API_KEY": "",
@@ -14,26 +15,32 @@
     "LOVABLE_API_KEY": "",
     "LOCAL_OLLAMA_ENDPOINT": "http://localhost:11434"
   },
-  "auto_provider_selection": {
-    "_note": "Used when simplicity_mode is true. Format: provider/model. First available key wins.",
-    "atlas-orchestrator":      { "priority": ["anthropic/claude-opus-4-6", "google/gemini-2.5-pro", "openai/gpt-4o"] },
-    "atlas-classifier":        { "priority": ["groq/llama-3.3-70b-versatile", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"] },
-    "atlas-critic":            { "priority": ["google/gemini-2.0-flash", "openai/gpt-4o-mini", "anthropic/claude-haiku-4-5-20251001"], "_why": "Cross-company validation catches what same-model misses" },
-    "atlas-backend-architect": { "priority": ["anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro", "openai/gpt-4o"] },
-    "atlas-backend-validator": { "priority": ["google/gemini-2.5-pro", "openai/gpt-4o", "anthropic/claude-sonnet-4-6"] },
-    "atlas-design-architect":  { "priority": ["v0/v0-latest", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"], "_why": "v0 produces significantly better React/Next.js UI" },
-    "atlas-design-validator":  { "priority": ["google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"] },
-    "atlas-frontend-builder":  { "priority": ["v0/v0-latest", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"] },
-    "atlas-integration":       { "priority": ["anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"] },
-    "atlas-testing":           { "priority": ["anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"] },
-    "atlas-scaling":           { "priority": ["groq/llama-3.3-70b-versatile", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"], "_why": "Groq is fastest for analysis" },
-    "atlas-nervous-system":    { "priority": ["google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"] }
+
+  "model_preferences": {
+    "_note": "Optional. Override the model ATLAS uses per provider per quality tier. Remove this whole section to use defaults.",
+
+    "google_smart": "gemini-2.5-pro",
+    "google_balanced": "gemini-2.0-flash-001",
+    "google_fast": "gemini-2.0-flash-001",
+
+    "anthropic_smart": "claude-opus-4-6",
+    "anthropic_balanced": "claude-sonnet-4-6",
+    "anthropic_fast": "claude-haiku-4-5-20251001",
+
+    "openai_smart": "gpt-4o",
+    "openai_balanced": "gpt-4o",
+    "openai_fast": "gpt-4o-mini",
+
+    "groq_fast": "llama-3.3-70b-versatile",
+    "groq_balanced": "llama-3.3-70b-versatile"
   },
+
   "fallback_strategy": {
-    "on_provider_unavailable": "try_next_in_priority_list",
-    "final_fallback": "anthropic/claude-sonnet-4-6",
-    "on_hard_stop_message": "No API keys found. Set ANTHROPIC_API_KEY or GOOGLE_AI_API_KEY at minimum.\nGet Gemini key (free): https://aistudio.google.com/apikey\nGet Anthropic key: https://console.anthropic.com"
+    "_note": "ATLAS automatically tries all your available providers on error. No configuration needed here.",
+    "on_provider_unavailable": "auto_try_all_available",
+    "on_hard_stop_message": "No API keys found.\nAdd at least one key to atlas.config.json or set it as an environment variable.\n\nFree options:\n  Google Gemini (free tier): https://aistudio.google.com/app/apikey  → GOOGLE_AI_API_KEY\n  Groq (free):               https://console.groq.com                 → GROQ_API_KEY\n\nPaid:\n  Anthropic Claude:          https://console.anthropic.com            → ANTHROPIC_API_KEY\n  OpenAI GPT:                https://platform.openai.com              → OPENAI_API_KEY"
   },
+
   "token_budgets": {
     "phase_0_foundation": 5000,
     "phase_1_architecture": 40000,
@@ -44,6 +51,7 @@
     "phase_6_scaling": 15000,
     "session_total_default": 300000
   },
+
   "loop_limits": {
     "architect_validator_max_rounds": 3,
     "design_loop_max_rounds": 3,
@@ -52,6 +60,7 @@
     "progress_threshold_percent": 5,
     "semantic_similarity_threshold": 0.85
   },
+
   "checkpoints": {
     "require_human_phase_1": true,
     "require_human_phase_2": true,
@@ -59,6 +68,7 @@
     "prompt_scaling_phase_6": true,
     "auto_proceed_simple_projects": true
   },
+
   "project": {
     "name": "",
     "description": "",

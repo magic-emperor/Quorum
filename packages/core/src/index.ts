@@ -4,6 +4,8 @@ export { NervousSystem } from './memory/nervous-system.js'
 export { AgentRunner } from './agent-runner.js'
 export { ToolExecutor } from './tool-executor.js'
 export { buildProvider, detectAvailableProviders, buildRoutingTable } from './providers/index.js'
+export { discoverProviderModels, envVarToProvider, providerToEnvVar } from './providers/index.js'
+export type { DiscoveryResult, DiscoveredTiers } from './providers/index.js'
 export type {
   ATLASConfig,
   ATLASRunOptions,

@@ -56,17 +56,18 @@ export class AgentRunner {
 
     onProgress?.(`[${agentName}] → ${routing.provider}/${routing.model}`)
 
-    const provider = buildProvider(routing.model, routing.provider)
-
     // Build message array
     const messages: AgentMessage[] = [
       ...conversationHistory,
       { role: 'user', content: userMessage }
     ]
 
-    // Run with tool call loop (max 10 iterations)
-    let response = await provider.call(messages, systemPrompt, maxTokens)
+    // Call provider with automatic fallback on hard errors (credit/auth/quota)
+    let response = await this.callWithFallback(
+      messages, systemPrompt, maxTokens, routing, agentName, onProgress
+    )
 
+    // Run with tool call loop (max 10 iterations)
     for (let i = 0; i < 10; i++) {
       const toolCalls = this.extractToolCalls(response.content)
       if (toolCalls.length === 0) break
@@ -86,11 +87,101 @@ export class AgentRunner {
       // Append assistant response + tool results and re-call
       messages.push({ role: 'assistant', content: response.content })
       messages.push({ role: 'user', content: toolResults.join('\n\n') })
-      response = await provider.call(messages, systemPrompt, maxTokens)
+      response = await this.callWithFallback(
+        messages, systemPrompt, maxTokens, routing, agentName, onProgress
+      )
     }
 
     return response
   }
+
+  // ─── Provider call with runtime fallback ─────────────────────────────────────
+  // If the primary provider fails with a hard error (credit/auth/quota/400),
+  // automatically try the next provider in fallback_chain.
+
+  private async callWithFallback(
+    messages: AgentMessage[],
+    systemPrompt: string,
+    maxTokens: number | undefined,
+    routing: import('./types.js').ResolvedModel,
+    agentName: string,
+    onProgress?: (msg: string) => void
+  ): Promise<AgentResponse> {
+    const providersToTry = [
+      { model: routing.model, provider: routing.provider },
+      ...(routing.fallback_chain ?? [])
+    ]
+
+    const failures: string[] = []
+
+    for (let i = 0; i < providersToTry.length; i++) {
+      const { model, provider } = providersToTry[i]!
+      try {
+        const p = buildProvider(model, provider)
+        return await p.call(messages, systemPrompt, maxTokens)
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        const status = (err as { status?: number }).status
+        const isHardError = this.isHardProviderError(errMsg, status)
+        const reason = this.summariseError(errMsg, status)
+        const hasMore = i < providersToTry.length - 1
+
+        if (isHardError && hasMore) {
+          onProgress?.(`  ⚠ ${provider}/${model} unavailable (${reason}) — trying next...`)
+          failures.push(`${provider}: ${reason}`)
+          continue
+        }
+
+        if (isHardError && !hasMore) {
+          // All providers exhausted — throw a clear ATLAS-formatted error
+          failures.push(`${provider}: ${reason}`)
+          const summary = failures.join(', ')
+          throw new Error(
+            `All providers failed for [${agentName}] — ${summary}.\n` +
+            `Check your API keys and credit balances in atlas.config.json`
+          )
+        }
+
+        // Non-retryable error (e.g. network, parsing) — rethrow as-is
+        throw err
+      }
+    }
+
+    throw new Error(`All providers failed for agent ${agentName}`)
+  }
+
+  private isHardProviderError(errMsg: string, status?: number): boolean {
+    // Numeric HTTP status check (Anthropic SDK APIError has .status)
+    if (status && [400, 401, 403, 429, 503].includes(status)) return true
+
+    const hardPatterns = [
+      'credit balance',
+      'insufficient_quota',
+      'billing',
+      'payment required',
+      'rate limit',
+      'too many requests',
+      'quota exceeded',
+      'overloaded',
+      'service unavailable',
+      'invalid_request_error',
+      'authentication_error'
+    ]
+    const lower = errMsg.toLowerCase()
+    // Also match "400 " at start (Anthropic SDK formats errors as "400 {...}")
+    if (/^(400|401|403|429|503)\s/.test(errMsg)) return true
+    return hardPatterns.some(p => lower.includes(p))
+  }
+
+  private summariseError(errMsg: string, status?: number): string {
+    if (status === 429 || errMsg.toLowerCase().includes('rate')) return 'rate limited'
+    if (status === 401 || errMsg.toLowerCase().includes('auth')) return 'invalid key'
+    if (status === 503 || errMsg.toLowerCase().includes('overload')) return 'overloaded'
+    if (errMsg.toLowerCase().includes('credit') || errMsg.toLowerCase().includes('billing')) return 'no credits'
+    if (status === 400) return 'bad request / no credits'
+    return 'error'
+  }
+
 
   private async loadAgentPrompt(
     agentName: string,

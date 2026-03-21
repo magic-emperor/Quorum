@@ -14,7 +14,35 @@ export interface ATLASConfig {
     LOVABLE_API_KEY?: string
     LOCAL_OLLAMA_ENDPOINT?: string
   }
-  auto_provider_selection: Record<string, {
+  // Which model to use per provider per quality tier.
+  // ATLAS auto-detects your keys and builds routing from this.
+  // No need to touch auto_provider_selection — just set your keys.
+  model_preferences?: {
+    // Google Gemini — put your GOOGLE_AI_API_KEY in api_keys above
+    google_smart?: string       // default: gemini-2.5-pro
+    google_balanced?: string    // default: gemini-2.0-flash-001
+    google_fast?: string        // default: gemini-2.0-flash-001
+
+    // Anthropic Claude — put your ANTHROPIC_API_KEY in api_keys above
+    anthropic_smart?: string    // default: claude-opus-4-6
+    anthropic_balanced?: string // default: claude-sonnet-4-6
+    anthropic_fast?: string     // default: claude-haiku-4-5-20251001
+
+    // OpenAI — put your OPENAI_API_KEY in api_keys above
+    openai_smart?: string       // default: gpt-4o
+    openai_balanced?: string    // default: gpt-4o
+    openai_fast?: string        // default: gpt-4o-mini
+
+    // Groq — put your GROQ_API_KEY in api_keys above
+    groq_fast?: string          // default: llama-3.3-70b-versatile
+    groq_balanced?: string      // default: llama-3.3-70b-versatile
+
+    // DeepSeek — put your DEEPSEEK_API_KEY in api_keys above
+    deepseek_balanced?: string  // default: deepseek-chat
+    deepseek_fast?: string      // default: deepseek-chat
+  }
+  // Optional: manual per-agent overrides. Leave empty to use dynamic routing.
+  auto_provider_selection?: Record<string, {
     priority: string[]
     _why?: string
   }>
@@ -25,7 +53,7 @@ export interface ATLASConfig {
   }
   fallback_strategy: {
     on_provider_unavailable: string
-    final_fallback: string
+    final_fallback?: string
     on_hard_stop_message: string
   }
   token_budgets: Record<string, number>
@@ -76,6 +104,7 @@ export interface ResolvedModel {
   model: string
   provider: string
   reason: string
+  fallback_chain?: Array<{ model: string; provider: string }>
 }
 
 export interface FallbackEvent {
