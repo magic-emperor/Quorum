@@ -1,68 +1,98 @@
 {
-  "version": "1.0",
-  "tier": "starter",
-  "_tier_options": "starter | standard | professional",
-  "_tier_starter": "Claude only — all agents use Claude models",
-  "_tier_standard": "Claude + GPT-4o-mini for Critic (cross-company validation)",
-  "_tier_professional": "Claude + GPT-4o + Gemini for large codebase analysis",
+  "version": "2.0",
+  "simplicity_mode": true,
 
-  "models": {
-    "atlas-orchestrator":       "claude-opus-4-6",
-    "atlas-classifier":         "claude-haiku-4-5-20251001",
-    "atlas-critic":             "claude-haiku-4-5-20251001",
-    "atlas-backend-architect":  "claude-sonnet-4-6",
-    "atlas-backend-validator":  "claude-sonnet-4-6",
-    "atlas-design-architect":   "claude-sonnet-4-6",
-    "atlas-design-validator":   "claude-haiku-4-5-20251001",
-    "atlas-frontend-builder":   "claude-sonnet-4-6",
-    "atlas-integration":        "claude-sonnet-4-6",
-    "atlas-testing":            "claude-sonnet-4-6",
-    "atlas-scaling":            "claude-haiku-4-5-20251001",
-    "atlas-nervous-system":     "claude-haiku-4-5-20251001"
+  "_README": "Set your API keys as environment variables. ATLAS auto-detects what you have and uses it optimally. Only ANTHROPIC_API_KEY is required.",
+
+  "api_keys": {
+    "_note": "Paste keys here OR set as env vars (env vars take priority)",
+    "ANTHROPIC_API_KEY": "",
+    "OPENAI_API_KEY": "",
+    "GOOGLE_AI_API_KEY": "",
+    "GROQ_API_KEY": "",
+    "DEEPSEEK_API_KEY": "",
+    "MISTRAL_API_KEY": "",
+    "V0_API_KEY": "",
+    "LOVABLE_API_KEY": "",
+    "LOCAL_OLLAMA_ENDPOINT": "http://localhost:11434"
   },
 
-  "_upgrade_critic_standard": "Change atlas-critic to gpt-4o-mini for cross-company validation",
-  "_upgrade_critic_professional": "Change atlas-critic to gpt-4o for strongest cross-company validation",
-  "_upgrade_architect_professional": "Change atlas-backend-architect to gemini-1.5-pro for 2M context on large codebases",
+  "auto_provider_selection": {
+    "_note": "Used when simplicity_mode is true. Format: provider/model. First available key wins.",
+    "atlas-orchestrator":      { "priority": ["anthropic/claude-opus-4-6", "openai/gpt-4o"] },
+    "atlas-classifier":        { "priority": ["groq/llama-3.3-70b-versatile", "anthropic/claude-haiku-4-5-20251001"] },
+    "atlas-critic":            { "priority": ["openai/gpt-4o-mini", "anthropic/claude-haiku-4-5-20251001"], "_why": "Cross-company validation catches what same-model misses" },
+    "atlas-backend-architect": { "priority": ["anthropic/claude-sonnet-4-6", "openai/gpt-4o"] },
+    "atlas-backend-validator": { "priority": ["openai/gpt-4o", "anthropic/claude-sonnet-4-6"] },
+    "atlas-design-architect":  { "priority": ["v0/v0-latest", "anthropic/claude-sonnet-4-6"], "_why": "v0 produces significantly better React/Next.js UI than general LLMs" },
+    "atlas-design-validator":  { "priority": ["anthropic/claude-haiku-4-5-20251001"] },
+    "atlas-frontend-builder":  { "priority": ["v0/v0-latest", "anthropic/claude-sonnet-4-6"] },
+    "atlas-integration":       { "priority": ["anthropic/claude-sonnet-4-6"] },
+    "atlas-testing":           { "priority": ["anthropic/claude-sonnet-4-6"] },
+    "atlas-scaling":           { "priority": ["groq/llama-3.3-70b-versatile", "anthropic/claude-haiku-4-5-20251001"], "_why": "Groq is fastest for analysis tasks — lower cost" },
+    "atlas-nervous-system":    { "priority": ["anthropic/claude-haiku-4-5-20251001"] }
+  },
 
-  "frontend_builder": {
-    "provider": "claude",
-    "_provider_options": "claude | v0 | lovable",
-    "v0_enabled": false,
-    "lovable_enabled": false,
-    "_v0_note": "Set v0_enabled: true and add V0_API_KEY to env to use v0 for frontend generation",
-    "_lovable_note": "Lovable API not yet public — check lovable.dev for updates"
+  "advanced_config": {
+    "_note": "Set enabled: true to override auto_provider_selection with per-agent control",
+    "enabled": false,
+    "providers": {
+      "anthropic": { "enabled": true,  "api_key_env": "ANTHROPIC_API_KEY", "base_url": "https://api.anthropic.com" },
+      "openai":    { "enabled": false, "api_key_env": "OPENAI_API_KEY",    "base_url": "https://api.openai.com/v1" },
+      "google":    { "enabled": false, "api_key_env": "GOOGLE_AI_API_KEY", "base_url": "https://generativelanguage.googleapis.com" },
+      "groq":      { "enabled": false, "api_key_env": "GROQ_API_KEY",      "base_url": "https://api.groq.com/openai/v1" },
+      "deepseek":  { "enabled": false, "api_key_env": "DEEPSEEK_API_KEY",  "base_url": "https://api.deepseek.com/v1" },
+      "local":     { "enabled": false, "api_key_env": "LOCAL_OLLAMA_ENDPOINT", "base_url": "http://localhost:11434" },
+      "v0":        { "enabled": false, "api_key_env": "V0_API_KEY",         "base_url": "https://api.v0.dev", "_status": "beta" },
+      "lovable":   { "enabled": false, "api_key_env": "LOVABLE_API_KEY",    "base_url": "https://api.lovable.dev", "_status": "beta" }
+    },
+    "models": {
+      "atlas-orchestrator":      { "model": "claude-opus-4-6",          "provider": "anthropic" },
+      "atlas-classifier":        { "model": "claude-haiku-4-5-20251001","provider": "anthropic" },
+      "atlas-critic":            { "model": "gpt-4o-mini",              "provider": "openai" },
+      "atlas-backend-architect": { "model": "claude-sonnet-4-6",         "provider": "anthropic" },
+      "atlas-backend-validator": { "model": "claude-sonnet-4-6",         "provider": "anthropic" },
+      "atlas-design-architect":  { "model": "claude-sonnet-4-6",         "provider": "anthropic" },
+      "atlas-design-validator":  { "model": "claude-haiku-4-5-20251001","provider": "anthropic" },
+      "atlas-frontend-builder":  { "model": "claude-sonnet-4-6",         "provider": "anthropic" },
+      "atlas-integration":       { "model": "claude-sonnet-4-6",         "provider": "anthropic" },
+      "atlas-testing":           { "model": "claude-sonnet-4-6",         "provider": "anthropic" },
+      "atlas-scaling":           { "model": "claude-haiku-4-5-20251001","provider": "anthropic" },
+      "atlas-nervous-system":    { "model": "claude-haiku-4-5-20251001","provider": "anthropic" }
+    }
+  },
+
+  "fallback_strategy": {
+    "_note": "What ATLAS does when a provider is unavailable",
+    "on_provider_unavailable": "try_next_in_priority_list",
+    "final_fallback": "anthropic/claude-sonnet-4-6",
+    "on_hard_stop_message": "No API keys found. Set ANTHROPIC_API_KEY at minimum.\nexport ANTHROPIC_API_KEY=your-key\nGet your key at: https://console.anthropic.com"
   },
 
   "token_budgets": {
-    "_note": "Per-phase token budgets — orchestrator warns at 75%, checkpoints at 90%",
-    "phase_0_foundation":          5000,
-    "phase_1_architecture":        40000,
-    "phase_2_design":              25000,
-    "phase_3_build_per_module":    80000,
-    "phase_4_integration":         30000,
-    "phase_5_testing":             60000,
-    "phase_6_scaling":             15000,
-    "critic_per_intervention":     3000,
-    "session_total_default":       300000
-  },
-
-  "budget_alerts": {
-    "warning_threshold":   0.75,
-    "checkpoint_threshold": 0.90,
-    "exceeded_action": "checkpoint_and_notify"
+    "_note": "Approximate token limits per phase. Increase for large projects.",
+    "phase_0_foundation": 5000,
+    "phase_1_architecture": 40000,
+    "phase_2_design": 25000,
+    "phase_3_build_per_module": 80000,
+    "phase_4_integration": 30000,
+    "phase_5_testing": 60000,
+    "phase_6_scaling": 15000,
+    "session_total_default": 300000
   },
 
   "loop_limits": {
+    "_note": "Max rounds for validation loops. Prevents infinite loops.",
     "architect_validator_max_rounds": 3,
-    "design_loop_max_rounds":         3,
-    "bug_fix_max_attempts":           2,
-    "integration_max_rounds":         2,
-    "progress_threshold_percent":     5,
-    "semantic_similarity_threshold":  0.85
+    "design_loop_max_rounds": 3,
+    "bug_fix_max_attempts": 2,
+    "integration_max_rounds": 2,
+    "progress_threshold_percent": 5,
+    "semantic_similarity_threshold": 0.85
   },
 
   "checkpoints": {
+    "_note": "Human approval gates. Set to false for fully autonomous mode.",
     "require_human_phase_1": true,
     "require_human_phase_2": true,
     "require_human_phase_5": true,
