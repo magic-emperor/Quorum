@@ -387,8 +387,10 @@ export interface FunctionEntry {
   calls: Array<{ function: string; file: string; reason: string }>
   agent_that_created: string
   session: string
+  last_modified_session?: string
   deleted: boolean
   tags: string[]
+  design_note?: string
 }
 
 export type ProjectComplexity = 'SIMPLE' | 'COMPLEX'

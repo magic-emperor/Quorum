@@ -18,6 +18,7 @@ import { TaskManager } from './memory/task-manager.js'
 import { PlanManager } from './memory/plan-manager.js'
 import { SessionBriefManager } from './memory/session-brief.js'
 import { ToolExecutor } from './tool-executor.js'
+import { FunctionRegistry } from './memory/function-registry.js'
 
 // Phase 3 command handlers
 import { runInit } from './commands/init.js'
@@ -52,9 +53,11 @@ export class ATLASEngine {
   private briefManager!: SessionBriefManager
   private runner!: AgentRunner
   private tools!: ToolExecutor
+  private functionRegistry!: FunctionRegistry
   private agentsDir: string
   private sessionId: string
   private projectDir: string
+  private initialized = false
 
   constructor(private options: {
     projectDir: string
@@ -69,6 +72,7 @@ export class ATLASEngine {
   }
 
   async initialize(): Promise<void> {
+    if (this.initialized) return
     this.config = await this.loadConfig()
 
     // Promote api_keys from atlas.config.json into process.env
@@ -102,10 +106,12 @@ export class ATLASEngine {
     )
     this.runner = new AgentRunner(this.projectDir)
     this.tools = new ToolExecutor(this.projectDir)
+    this.functionRegistry = new FunctionRegistry(this.projectDir)
 
     // Initialize task + plan indexes (creates files if first run)
     await this.taskManager.initialize()
     await this.planManager.initialize()
+    this.initialized = true
   }
 
   async run(options: ATLASRunOptions): Promise<void> {
@@ -256,13 +262,19 @@ export class ATLASEngine {
     const { onProgress } = hooks
 
     if (!(await this.ns.exists())) {
-      onProgress?.('No .atlas/ found. Run atlas new first.')
+      onProgress?.('No .atlas/ found. Run: atlas init')
       return
     }
+
+    // Scope guard — check if this is in scope
+    if (!(await this.checkScopeGuard(description, onProgress))) return
 
     onProgress?.('Loading project context...')
     const memory = await this.ns.getFullMemory()
     onProgress?.(`Loaded ${memory.decisions.length} decisions, ${memory.actions.length} actions.`)
+
+    // Function registry context — cheap navigation instead of reading files
+    const registryContext = await this.functionRegistry.getContextSummary()
 
     const memoryContext = JSON.stringify({
       decisions: memory.decisions.slice(-20),
@@ -270,50 +282,81 @@ export class ATLASEngine {
       bugs: memory.bugs.filter(b => b.status !== 'FIXED')
     })
 
+    const context = `${registryContext}\n\nProject memory:\n${memoryContext}`
+
     onProgress?.(`\nEnhancing: ${description}`)
-    await this.runBuildPhase(description, hooks, memoryContext)
+    await this.runBuildPhase(description, hooks, context)
+
+    // Update function registry after changes
+    await this.functionRegistry.scanAndUpdate(this.sessionId, onProgress)
+
     await this.saveSession(hooks)
   }
 
   // ── atlas status ────────────────────────────────────────────────────────────
 
-  private async runStatus(hooks: Hooks): Promise<void> {
+  private async runStatus(hooks: Hooks & { extra?: Record<string, string> }): Promise<void> {
     const { onProgress } = hooks
+    const extra = (hooks as ATLASRunOptions).extra ?? {}
 
-    // Providers
+    onProgress?.('\nATLAS STATUS')
+    onProgress?.('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+    // Active providers
     const active = this.routingTable.providers_active
-    onProgress?.(`Providers: ${active.length > 0 ? active.join(', ') : 'none detected — set an API key'}`)
+    onProgress?.(`Providers: ${active.length > 0 ? active.join(', ') : 'none — run: atlas key add PROVIDER_KEY=your-key'}`)
 
-    // Project state — read index files only (no agents, no token burn)
+    // Optional: full routing table
+    if (extra['routing'] === 'true') {
+      onProgress?.('\nROUTING TABLE:')
+      for (const [agent, routing] of Object.entries(this.routingTable.session_routing_table)) {
+        onProgress?.(`  ${agent.padEnd(35)} ${routing.provider}/${routing.model}`)
+      }
+    }
+
     const atlasDir = path.join(this.projectDir, '.atlas')
     if (await this.ns.exists()) {
-      const taskIndexPath  = path.join(atlasDir, 'task-index.json')
-      const planIndexPath  = path.join(atlasDir, 'plan-index.json')
-      const briefPath      = path.join(atlasDir, 'context', 'session-brief.md')
+      const taskIndexPath = path.join(atlasDir, 'task-index.json')
+      const planIndexPath = path.join(atlasDir, 'plan-index.json')
 
       if (existsSync(taskIndexPath)) {
         const ti = JSON.parse(await readFile(taskIndexPath, 'utf-8')) as {
-          total: number; summary: { complete: number; in_progress: number; blocked: number }
+          total: number; summary: { complete: number; in_progress: number; blocked: number; todo: number }
+          current_milestone?: string
         }
-        onProgress?.(`Tasks: ${ti.summary.complete}/${ti.total} complete, ${ti.summary.in_progress} in progress, ${ti.summary.blocked} blocked`)
+        onProgress?.(`\nTASKS: ${ti.summary.complete}/${ti.total} complete | ${ti.summary.in_progress} in progress | ${ti.summary.blocked} blocked`)
+        if (ti.current_milestone) onProgress?.(`Milestone: ${ti.current_milestone}`)
       }
 
       if (existsSync(planIndexPath)) {
         const pi = JSON.parse(await readFile(planIndexPath, 'utf-8')) as {
           current_phase: string; current_milestone: string
+          phases?: Array<{ name: string; status: string; tasks_complete: number; task_count: number }>
         }
-        onProgress?.(`Phase: ${pi.current_phase || 'none'} | Milestone: ${pi.current_milestone || 'MVP'}`)
+        onProgress?.(`Plan phase: ${pi.current_phase || 'none'}`)
+
+        // Progress breakdown if requested
+        if (extra['progress'] === 'true' && pi.phases) {
+          onProgress?.('\nPROGRESS:')
+          pi.phases.forEach(p => {
+            const icon = p.status === 'COMPLETE' ? '✓' : p.status === 'IN_PROGRESS' ? '→' : '○'
+            const pct = p.task_count > 0 ? Math.round((p.tasks_complete / p.task_count) * 100) : 0
+            onProgress?.(`  ${icon} ${p.name}: ${p.tasks_complete}/${p.task_count} tasks (${pct}%)`)
+          })
+        }
       }
 
-      if (!existsSync(taskIndexPath) && !existsSync(planIndexPath)) {
-        // Old-style .atlas/ — show plan summary only
-        const plan = await this.ns.readPlan()
-        const firstLine = plan.split('\n').find(l => l.trim()) ?? '(no plan)'
-        onProgress?.(`Project loaded — ${firstLine}`)
+      if (extra['decisions'] === 'true') {
+        const decisions = await this.ns.readDecisions()
+        onProgress?.('\nRECENT DECISIONS:')
+        decisions.slice(-5).forEach(d => onProgress?.(`  ${d.id}: ${d.what}`))
       }
+
     } else {
-      onProgress?.('No project loaded   →  atlas new "describe what to build"')
+      onProgress?.('\nNo .atlas/ found → run: atlas init')
     }
+
+    onProgress?.('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   }
 
   // ── atlas sync ──────────────────────────────────────────────────────────────
@@ -321,14 +364,119 @@ export class ATLASEngine {
   private async runSync(hooks: Hooks): Promise<void> {
     const { onProgress } = hooks
     onProgress?.('Syncing project index...')
-    const result = await this.tools.execute({ tool: 'glob_search', pattern: 'src/**/*', max_results: 500 })
+
+    const result = await this.tools.execute({ tool: 'glob_search', pattern: 'src/**/*', max_results: 1000 })
     const count = result.output.split('\n').filter(Boolean).length
-    onProgress?.(`Found ${count} source files. Sync complete.`)
+    onProgress?.(`Scanned ${count} source files`)
+
+    // Rebuild function registry
+    await this.functionRegistry.scanAndUpdate(this.sessionId, onProgress)
+
+    onProgress?.('Sync complete.')
   }
 
-  // ── Phase helpers ───────────────────────────────────────────────────────────
+  // ── New helpers (Phase 4) ───────────────────────────────────────────────────
 
-  // ─── Phase 2: Session context ─────────────────────────────────────────────
+  private async checkScopeGuard(
+    description: string,
+    onProgress?: (msg: string) => void
+  ): Promise<boolean> {
+    if (!this.goalGuardian.exists()) return true
+
+    const result = await this.goalGuardian.checkScope(description)
+
+    if (result.recommendation === 'BLOCK') {
+      onProgress?.(`SCOPE GUARD: ${result.reasoning}`)
+      onProgress?.('This is explicitly out of scope per goal.md.')
+      onProgress?.('To proceed: update .atlas/goal.md and re-run.')
+      return false
+    }
+
+    if (result.recommendation === 'CLARIFY') {
+      onProgress?.(`SCOPE NOTE: ${result.reasoning}`)
+    }
+
+    return true
+  }
+
+  private async ensurePlanExists(
+    description: string,
+    options: ATLASRunOptions
+  ): Promise<boolean> {
+    const { onProgress, onCheckpoint, onAgentOutput } = options
+
+    if (this.planManager.exists()) return true
+
+    onProgress?.('\nNo implementation plan — creating one before building...')
+
+    const planResponse = await this.runner.run({
+      agentName: 'atlas-planner',
+      userMessage: `Create implementation plan for: ${description}`,
+      projectDir: this.projectDir,
+      agentsDir: this.agentsDir,
+      routingTable: this.routingTable,
+      onProgress
+    })
+    onAgentOutput?.('atlas-planner', planResponse.content)
+
+    if (!options.auto && onCheckpoint) {
+      const response = await onCheckpoint({
+        type: 'BLOCKER',
+        title: 'Implementation Plan Approval',
+        completed: ['Goal analyzed', 'Phases designed', 'Tasks drafted'],
+        question: 'Approve the implementation plan before code is written.',
+        options: [
+          { label: 'APPROVE', tradeoff: 'Build starts' },
+          { label: 'REQUEST CHANGES', tradeoff: 'Plan revised first' }
+        ],
+        supportingDoc: '.atlas/implementation-plan.md'
+      })
+
+      if (!response.toUpperCase().includes('APPROVE') && response !== 'A') {
+        const revised = await this.runner.run({
+          agentName: 'atlas-planner',
+          userMessage: `Revise plan: ${response}\nOriginal:\n${planResponse.content}`,
+          projectDir: this.projectDir,
+          agentsDir: this.agentsDir,
+          routingTable: this.routingTable,
+          onProgress
+        })
+        onAgentOutput?.('atlas-planner (revision)', revised.content)
+      }
+    }
+
+    return true
+  }
+
+  private async createRollbackPoint(name: string): Promise<void> {
+    const { mkdir: mkdirAsync, writeFile: writeFileAsync } = await import('fs/promises')
+    const rollbackDir = path.join(this.projectDir, '.atlas', 'rollback_points', name)
+    await mkdirAsync(rollbackDir, { recursive: true })
+
+    const snapshot = {
+      name,
+      created: new Date().toISOString(),
+      session: this.sessionId,
+      task_summary: await this.taskManager.getContextSummary()
+    }
+
+    await writeFileAsync(
+      path.join(rollbackDir, 'snapshot.json'),
+      JSON.stringify(snapshot, null, 2),
+      'utf-8'
+    )
+  }
+
+  private inferFolderScope(description: string): string {
+    const lower = description.toLowerCase()
+    if (lower.includes('auth') || lower.includes('login') || lower.includes('password')) return 'src/auth/'
+    if (lower.includes('api') || lower.includes('endpoint') || lower.includes('route')) return 'src/api/'
+    if (lower.includes('dashboard') || lower.includes('ui') || lower.includes('component')) return 'src/components/'
+    if (lower.includes('database') || lower.includes('migration') || lower.includes('schema')) return 'src/db/'
+    if (lower.includes('test')) return 'src/__tests__/'
+    return 'src/'
+  }
+
 
   private async loadSessionContext(onProgress?: (msg: string) => void): Promise<string> {
     try {
@@ -340,116 +488,6 @@ export class ATLASEngine {
     } catch {
       return ''
     }
-  }
-
-  // ─── Phase 2: Scope guard ─────────────────────────────────────────────────
-
-  private async checkScopeGuard(
-    description: string,
-    onProgress?: (msg: string) => void
-  ): Promise<boolean> {
-    if (!this.goalGuardian.exists()) return true
-
-    const result = await this.goalGuardian.checkScope(description)
-
-    if (result.recommendation === 'BLOCK') {
-      onProgress?.(`⛔ SCOPE GUARD: ${result.reasoning}`)
-      onProgress?.('To proceed: update .atlas/goal.md manually and re-run.')
-      return false
-    }
-
-    if (result.recommendation === 'CLARIFY') {
-      onProgress?.(`⚠ SCOPE UNCLEAR: ${result.reasoning}`)
-      // Surface as warning only — don't block
-    }
-
-    return true
-  }
-
-  // ─── Phase 2: Plan gate ───────────────────────────────────────────────────
-
-  private async ensurePlanExists(
-    description: string,
-    hooks: Hooks
-  ): Promise<boolean> {
-    const { onProgress, onCheckpoint, onAgentOutput } = hooks
-
-    if (this.planManager.exists()) return true
-
-    onProgress?.('\nNo implementation plan found — creating one before building...')
-
-    const planResponse = await this.runner.run({
-      agentName: 'atlas-planner',
-      userMessage: `Create implementation plan for: ${description}`,
-      projectDir: this.projectDir,
-      agentsDir: this.agentsDir,
-      routingTable: this.routingTable,
-      onProgress
-    })
-
-    onAgentOutput?.('atlas-planner', planResponse.content)
-
-    if (onCheckpoint) {
-      const checkpoint: Checkpoint = {
-        type: 'BLOCKER',
-        title: 'Implementation Plan Approval',
-        completed: ['Goal analysis', 'Phase breakdown', 'Task drafts created'],
-        question: 'Review the plan before code is written. Approve to proceed, or describe changes.',
-        options: [
-          { label: 'APPROVE', tradeoff: 'Build starts immediately' },
-          { label: 'REQUEST CHANGES', tradeoff: 'Plan revised, then re-reviewed' }
-        ],
-        supportingDoc: '.atlas/implementation-plan.md'
-      }
-
-      const response = await onCheckpoint(checkpoint)
-
-      if (!response.toUpperCase().includes('APPROVE') && response !== 'A') {
-        const revisedPlan = await this.runner.run({
-          agentName: 'atlas-planner',
-          userMessage: `Revise plan based on feedback: ${response}\n\nOriginal plan:\n${planResponse.content}`,
-          projectDir: this.projectDir,
-          agentsDir: this.agentsDir,
-          routingTable: this.routingTable,
-          onProgress
-        })
-        onAgentOutput?.('atlas-planner', revisedPlan.content)
-      }
-    }
-
-    return true
-  }
-
-  // ─── Phase 2: Impact analysis ─────────────────────────────────────────────
-
-  private async runImpactAnalysis(
-    description: string,
-    onProgress?: (msg: string) => void
-  ): Promise<string> {
-    onProgress?.('Analyzing impact on existing work...')
-    const keywords = description.toLowerCase().split(/\s+/).filter(w => w.length > 3)
-    const folderScope = this.inferFolderScope(description)
-    const analysis = await this.taskManager.analyzeImpact(description, keywords, folderScope)
-
-    if (analysis.related_tasks.length > 0) {
-      onProgress?.(`Found ${analysis.related_tasks.length} related task(s):`)
-      for (const r of analysis.related_tasks) {
-        const flag = r.requires_update ? ' ← NEEDS UPDATE' : ''
-        onProgress?.(`  ${r.task_id}: ${r.title} (${r.relationship})${flag}`)
-      }
-    }
-
-    return JSON.stringify(analysis, null, 2)
-  }
-
-  private inferFolderScope(description: string): string {
-    const lower = description.toLowerCase()
-    if (lower.includes('auth') || lower.includes('login') || lower.includes('password')) return 'src/auth/'
-    if (lower.includes('api') || lower.includes('endpoint') || lower.includes('route')) return 'src/api/'
-    if (lower.includes('dashboard') || lower.includes('ui') || lower.includes('component')) return 'src/components/'
-    if (lower.includes('database') || lower.includes('migration') || lower.includes('schema')) return 'src/db/'
-    if (lower.includes('test')) return 'src/__tests__/'
-    return 'src/'
   }
 
   private async classify(description: string, hooks: Hooks): Promise<ClassificationResult> {

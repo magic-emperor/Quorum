@@ -1,6 +1,7 @@
 // Public API for @atlas/core
 export { ATLASEngine } from './engine.js'
 export { NervousSystem } from './memory/nervous-system.js'
+export { FunctionRegistry } from './memory/function-registry.js'
 export { AgentRunner } from './agent-runner.js'
 export { ToolExecutor } from './tool-executor.js'
 export { buildProvider, detectAvailableProviders, buildRoutingTable } from './providers/index.js'

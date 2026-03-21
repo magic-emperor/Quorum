@@ -1,0 +1,23 @@
+{
+  "name": "@atlas/mcp",
+  "version": "1.0.0",
+  "description": "ATLAS MCP server — exposes 14 ATLAS tools to Claude Desktop, Cursor, Windsurf, and any MCP-compatible client",
+  "type": "module",
+  "bin": {
+    "atlas-mcp": "./dist/server.js"
+  },
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@atlas/core": "*",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
