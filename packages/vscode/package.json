@@ -1,0 +1,113 @@
+{
+  "name": "atlas-vscode",
+  "displayName": "ATLAS — Autonomous Development",
+  "description": "Autonomous multi-agent development framework. One command builds your entire application.",
+  "version": "1.0.0",
+  "publisher": "atlas",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["AI", "Other"],
+  "keywords": ["AI", "autonomous", "agents", "development", "atlas"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "atlas.new",            "title": "ATLAS: New Feature",          "icon": "$(add)" },
+      { "command": "atlas.enhance",        "title": "ATLAS: Enhance Feature",      "icon": "$(edit)" },
+      { "command": "atlas.fast",           "title": "ATLAS: Fast Task",            "icon": "$(zap)" },
+      { "command": "atlas.next",           "title": "ATLAS: What's Next?",         "icon": "$(arrow-right)" },
+      { "command": "atlas.init",           "title": "ATLAS: Initialize Project",   "icon": "$(rocket)" },
+      { "command": "atlas.doctor",         "title": "ATLAS: Doctor (Health Check)","icon": "$(heart)" },
+      { "command": "atlas.status",         "title": "ATLAS: Status",               "icon": "$(pulse)" },
+      { "command": "atlas.discuss",        "title": "ATLAS: Discuss Feature",      "icon": "$(comment-discussion)" },
+      { "command": "atlas.verify",         "title": "ATLAS: Verify (UAT)",         "icon": "$(check-all)" },
+      { "command": "atlas.ship",           "title": "ATLAS: Ship (Create PR)",     "icon": "$(git-pull-request)" },
+      { "command": "atlas.review",         "title": "ATLAS: Code Review",          "icon": "$(eye)" },
+      { "command": "atlas.map",            "title": "ATLAS: Map Codebase",         "icon": "$(map)" },
+      { "command": "atlas.debug",          "title": "ATLAS: Debug Issue",          "icon": "$(bug)" },
+      { "command": "atlas.sessionReport",  "title": "ATLAS: Session Report",       "icon": "$(notebook)" },
+      { "command": "atlas.pause",          "title": "ATLAS: Pause Session",        "icon": "$(debug-pause)" },
+      { "command": "atlas.resume",         "title": "ATLAS: Resume Session",       "icon": "$(debug-start)" },
+      { "command": "atlas.sync",           "title": "ATLAS: Sync Index",           "icon": "$(sync)" },
+      { "command": "atlas.rollback",       "title": "ATLAS: Rollback",             "icon": "$(discard)" },
+      { "command": "atlas.agents",         "title": "ATLAS: List Agents",          "icon": "$(organization)" },
+      { "command": "atlas.profile",        "title": "ATLAS: Switch Profile",       "icon": "$(settings-gear)" },
+      { "command": "atlas.seed",           "title": "ATLAS: Capture Idea (Seed)",  "icon": "$(lightbulb)" },
+      { "command": "atlas.note",           "title": "ATLAS: Quick Note",           "icon": "$(pencil)" },
+      { "command": "atlas.backlog",        "title": "ATLAS: Backlog",              "icon": "$(list-unordered)" },
+      { "command": "atlas.showPanel",      "title": "ATLAS: Show Panel",           "icon": "$(layout-sidebar-right)" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "atlas-sidebar",
+          "title": "ATLAS",
+          "icon": "$(robot)"
+        }
+      ]
+    },
+    "views": {
+      "atlas-sidebar": [
+        {
+          "id": "atlas.panel",
+          "name": "ATLAS",
+          "type": "webview"
+        }
+      ]
+    },
+    "menus": {
+      "editor/context": [
+        { "command": "atlas.review",   "group": "atlas@1", "when": "editorHasSelection || editorTextFocus" },
+        { "command": "atlas.debug",    "group": "atlas@2" },
+        { "command": "atlas.enhance",  "group": "atlas@3" }
+      ],
+      "view/title": [
+        { "command": "atlas.next",   "group": "navigation", "when": "view == atlas.panel" },
+        { "command": "atlas.status", "group": "navigation", "when": "view == atlas.panel" }
+      ]
+    },
+    "keybindings": [
+      { "command": "atlas.new",    "key": "ctrl+shift+a n", "mac": "cmd+shift+a n" },
+      { "command": "atlas.next",   "key": "ctrl+shift+a x", "mac": "cmd+shift+a x" },
+      { "command": "atlas.fast",   "key": "ctrl+shift+a f", "mac": "cmd+shift+a f" },
+      { "command": "atlas.doctor", "key": "ctrl+shift+a d", "mac": "cmd+shift+a d" }
+    ],
+    "configuration": {
+      "title": "ATLAS",
+      "properties": {
+        "atlas.projectDir": {
+          "type": "string",
+          "default": "",
+          "description": "Override project directory (defaults to workspace root)"
+        },
+        "atlas.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open ATLAS panel on activation"
+        },
+        "atlas.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show ATLAS status bar item"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "dependencies": {
+    "@atlas/core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.4.0"
+  }
+}
