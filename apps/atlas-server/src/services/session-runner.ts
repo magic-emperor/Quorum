@@ -29,8 +29,18 @@ export class SessionRunner {
     // Inject user's decrypted API keys + auto flag into child process env
     const userKeys = getUserApiKeys(this.userId)
 
-    const atlasArgs = [command]
-    if (description) atlasArgs.push(description)
+    let atlasArgs: string[] = []
+    if (typeof command === 'string') {
+      const parts = command.trim().split(' ')
+      const cmdStart = parts[0]
+      if ((cmdStart === 'new' || cmdStart === 'enhance') && parts.length > 1) {
+        atlasArgs = [cmdStart, parts.slice(1).join(' ')]
+      } else {
+        atlasArgs = parts
+      }
+    } else if (Array.isArray(command)) {
+      atlasArgs = command
+    }
     atlasArgs.push('--dir', projectDir)
     // Only pass --auto for commands that accept it (new, enhance, fast)
     const autoSupportedCommands = ['new', 'enhance', 'fast']
