@@ -13,7 +13,7 @@ export {
   runInit, runFast, runNext, runPause, runResume,
   runDoctor, runDiscuss, runVerify, runShip, runReview,
   runMap, runDebug, runSessionReport, runSeed, runBacklog, runNote,
-  runAgents, runProfile
+  runAgents, runProfile, runExport
 } from './commands/index.js'
 
 export type {

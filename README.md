@@ -2,193 +2,199 @@
 
 **Autonomous Team for Large-scale Application Systems**
 
-ATLAS is a multi-agent orchestration and memory framework for [Claude Code](https://claude.ai/code). One command. Twelve coordinated agents. A complete application — with full documentation, E2E tests, and cost analysis.
+ATLAS is a multi-agent AI framework that builds features end-to-end — with persistent memory, 12 coordinated agents, and 5 ways to use it.
 
-```
-/atlas-new "Build me a SaaS for restaurant management with real-time orders"
+```bash
+atlas new "Build a SaaS for restaurant management with real-time orders"
 ```
 
 ↓ ~40 minutes later ↓
 
-Working application. Architecture documentation. Bug registry. Cost analysis at 4 scales.
-Total human time spent: **~40 minutes**.
+Working application. Architecture docs. Bug registry. Cost analysis. Zero re-explanation next session.
 
 ---
 
-## What Makes ATLAS Different
+## 5 Ways to Use ATLAS
 
-| Regular Claude Code | ATLAS |
-|---|---|
-| Call agents manually one by one | One command triggers the full pipeline |
-| Context resets every session | `.atlas/` persists all decisions, reasoning, and code maps permanently |
-| Agents make blind assumptions | `atlas-critic` blocks any claim not backed by evidence |
-| You orchestrate everything | `atlas-orchestrator` coordinates 12 agents automatically |
-| Same bugs happen again | `bug-registry.json` teaches agents from every bug ever found |
+| Platform | How | Use Case |
+|----------|-----|----------|
+| **CLI** | `npm i -g @atlas/cli` → `atlas new "..."` | Developers — primary interface |
+| **VS Code** | Install extension → sidebar panel | IDE-first workflow |
+| **MCP** | Add to Claude Desktop config | Claude Desktop tool use |
+| **Mobile** | Expo Go → atlas-console | Monitor sessions anywhere |
+| **Telegram** | `/login` → link account | Get notified, /stop a run |
 
 ---
 
-## The Pipeline
+## Commands (25+)
 
+### Core Build Pipeline
+| Command | Description |
+|---------|-------------|
+| `atlas new "desc"` | Full 12-agent pipeline — new feature from scratch |
+| `atlas enhance "desc"` | Modify existing feature (reads .atlas/ context) |
+| `atlas fast "desc"` | Skip planning for simple tasks (classifier decides) |
+| `atlas discuss "desc"` | Pre-planning Q&A — saves to `.atlas/context/discuss-{slug}.md` |
+
+### Session Control
+| Command | Description |
+|---------|-------------|
+| `atlas next` | Resume: what's the next task from `.atlas/task.md`? |
+| `atlas pause` | Save session state (resume later) |
+| `atlas resume` | Continue from saved pause point |
+| `atlas status` | Current phase, routing table, estimated cost |
+| `atlas session-report` | Markdown summary of this session |
+
+### Quality & Review
+| Command | Description |
+|---------|-------------|
+| `atlas verify` | Run E2E tests + validation suite |
+| `atlas review "target"` | Code review of a file or PR |
+| `atlas debug "symptom"` | Root cause analysis + fix |
+| `atlas ship` | Pre-ship checklist + safety checks |
+
+### Project Memory
+| Command | Description |
+|---------|-------------|
+| `atlas init` | Initialize `.atlas/` for an existing project |
+| `atlas map [area]` | Generate `DEVGUIDE.md` — instant onboarding documentation |
+| `atlas seed "text"` | Add to the Nervous System memory |
+| `atlas backlog add "task"` | Add to structured backlog |
+| `atlas note "text"` | Quick note to `.atlas/NOTES.md` |
+| `atlas export [--output path]` | Export `.atlas/` as shareable markdown document |
+
+### Configuration & Monitoring
+| Command | Description |
+|---------|-------------|
+| `atlas doctor` | Check config, providers, agent health |
+| `atlas agents` | List all agents + model assignments |
+| `atlas profile <name>` | Switch model tier: `fast`, `balanced`, `quality` |
+| `atlas key add/list/remove` | Manage encrypted API keys |
+| `atlas sync` | Re-index after manual code changes |
+| `atlas rollback [point]` | Return to previous rollback point |
+
+### CI/CD Mode
+```bash
+# Skip all human checkpoints — for GitHub Actions, Docker builds
+atlas new "Add OAuth login" --auto
+atlas verify --auto
+atlas ship --auto
 ```
-Phase 0 │ atlas-classifier     → SIMPLE or COMPLEX (5 seconds)
-        │ atlas-foundation-mode → Seeds .atlas/ on new projects (once only)
-        │
-Phase 1 │ atlas-backend-architect  ──→ architecture-proposal.md
-        │ atlas-critic              ──→ verifies every claim
-        │ atlas-backend-validator   ──→ confidence loop to 100%
-        │ *** CHECKPOINT A: you approve architecture (~5 min) ***
-        │
-Phase 2 │ atlas-design-architect   ──→ 4 UI design variations + v0 prompts
-        │ atlas-design-validator   ──→ confirms buildability
-        │ *** CHECKPOINT B: you pick a design (~5-10 min) ***
-        │
-Phase 3 │ atlas-backend-architect  ──→ builds backend code      ─┐ (parallel)
-        │ atlas-frontend-builder   ──→ builds frontend code     ─┘
-        │
-Phase 4 │ atlas-integration        ──→ reconciles API contracts field-by-field
-        │
-Phase 5 │ atlas-testing            ──→ E2E browser tests + bug registry
-        │ *** CHECKPOINT C: you review test results (~15 min) ***
-        │
-Phase 6 │ atlas-scaling (optional) ──→ cost + bottleneck analysis
-        │
-Always  │ atlas-nervous-system     ──→ saves all decisions/actions to .atlas/
+
+#### GitHub Actions Example
+```yaml
+- name: ATLAS Build
+  run: atlas new "${{ github.event.inputs.feature }}" --auto
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
 ---
 
-## The Project Memory System (`.atlas/`)
+## Where ATLAS Beats Claude Code
 
-Every project using ATLAS gets a `.atlas/` folder committed to its Git. It makes every future session start with full context — no re-explanation, ever.
+| ATLAS Advantage | Claude Code |
+|----------------|-------------|
+| Persistent `.atlas/` memory — no re-explanation ever | Context resets every session |
+| Multi-model routing (Anthropic, OpenAI, Google, Groq) | Single provider |
+| `atlas-critic` blocks all unverified claims | Agents make blind assumptions |
+| Function Registry — 99% cheaper codebase navigation | Full file reads every time |
+| Real E2E browser tests via Playwright | Text-based test suggestions |
+| Scope enforcement via `goal.md` + GoalGuardian | No scope control |
+| `BUGS.md` teaches agents from every past bug | Same bugs repeat |
+
+---
+
+## AI Providers
+
+| Provider | Models |
+|----------|--------|
+| Anthropic | Claude 3.5 Sonnet, Claude 3 Haiku |
+| OpenAI | GPT-4o, GPT-4o-mini |
+| Google | Gemini 1.5 Pro, Gemini 1.5 Flash |
+| Groq | Llama 3.1 70B, Llama 3.1 8B (fast + cheap) |
+| DeepSeek | DeepSeek-V2 |
+| Mistral | Mistral Large |
+| Ollama | Any local model |
+
+Auto-discovery: `atlas doctor` detects which keys are available and builds a routing table.
+
+---
+
+## Quick Start
+
+```bash
+# Install CLI
+npm install -g @atlas/cli
+
+# Initialize a project
+cd your-project
+atlas init
+
+# Check what's available
+atlas doctor
+
+# Start building
+atlas new "Add user authentication with OAuth"
+```
+
+---
+
+## Project Memory (`.atlas/`)
 
 ```
 your-project/
 └── .atlas/
-    ├── plan.md                          ← active execution plan
-    ├── history_plan.md                  ← immutable session archive
-    ├── DEVGUIDE.md                      ← living architecture documentation
-    ├── BUGS.md                          ← all bugs ever found + fixes
+    ├── goal.md                     ← project goal (enforced by GoalGuardian)
+    ├── task.md                     ← task log
+    ├── DEVGUIDE.md                 ← auto-generated by atlas map
+    ├── BUGS.md                     ← bug registry
+    ├── NOTES.md                    ← quick notes
+    ├── context/
+    │   ├── discuss-{slug}.md       ← discuss output (auto-loaded by atlas new)
+    │   └── codebase-map.md
     └── nervous-system/
-        ├── decisions.json               ← every decision + reasoning
-        ├── actions.json                 ← every agent action + outcome
-        ├── function-registry.json       ← every function mapped (99% cheaper nav)
-        ├── bug-registry.json            ← bug patterns (Critic uses to prevent recurrence)
-        ├── stack.json                   ← confirmed tech stack
-        └── test-coverage.json           ← coverage state
+        ├── decisions.json
+        ├── actions.json
+        ├── function-registry.json  ← 99% cheaper codebase nav
+        ├── stack.json
+        └── open-questions.json
 ```
 
 ---
 
-## Installation
+## Server Deployment (Docker)
 
-### Option 1: Use as Claude Code Plugin (Recommended)
-
-1. Clone this repo into your Claude Code plugins directory:
-   ```bash
-   git clone https://github.com/magic-emperor/ATLAS-CLAUDE.git
-   ```
-
-2. Copy `atlas.config.json.template` to your project root and rename it:
-   ```bash
-   cp atlas.config.json.template /your/project/atlas.config.json
-   ```
-
-3. Open your project in Claude Code. ATLAS agents are available immediately.
-
-4. Run your first command:
-   ```
-   /atlas-new "Describe what you want to build"
-   ```
-
-### Option 2: Manual Install
-
-Copy the three folders into your Claude Code project's plugin directory:
 ```bash
-cp -r agents/ skills/ commands/ /path/to/your/claude-code-project/
-cp atlas.config.json.template /path/to/your/project/atlas.config.json
+cp .env.example .env
+# Edit .env with your JWT_SECRET, TELEGRAM_BOT_TOKEN, etc.
+docker-compose up -d
 ```
 
----
-
-## Configuration
-
-Copy `atlas.config.json.template` to your project root as `atlas.config.json`.
-
-**Tiers:**
-
-| Tier | Models | Best for |
-|------|--------|----------|
-| `starter` | All Claude | Solo developers, most projects |
-| `standard` | Claude + GPT-4o-mini for Critic | Teams wanting cross-company validation |
-| `professional` | Claude + GPT-4o + Gemini | 500K+ line codebases |
-
-Change one line to switch tiers:
-```json
-{ "tier": "standard" }
-```
-
-**Frontend Builder options:**
-```json
-"frontend_builder": {
-  "provider": "claude",    // ← or "v0" if you have V0_API_KEY
-  "v0_enabled": false
-}
-```
+- Web dashboard: http://localhost:3000
+- API server: http://localhost:3001
 
 ---
 
-## Commands
-
-| Command | What it does |
-|---------|-------------|
-| `/atlas-new "description"` | Start a new feature or project — runs full pipeline |
-| `/atlas-enhance "change"` | Modify existing feature — reads .atlas/ context automatically |
-| `/atlas-status` | See current phase, decisions, token cost |
-| `/atlas-rollback` | Return to a previous ATLAS checkpoint |
-| `/atlas-sync` | Re-index project after manual changes outside ATLAS |
-
----
-
-## Human Checkpoints (3 Total)
-
-ATLAS never proceeds past these points without your explicit approval:
-
-| Checkpoint | When | Your Time |
-|---|---|---|
-| **A** | Backend architecture designed | ~5 min — review + type APPROVE |
-| **B** | Frontend design options ready | ~5-10 min — pick 1 of 4 options |
-| **C** | E2E tests complete | ~15 min — review bug report + type APPROVE |
-
----
-
-## Repository Structure
+## Monorepo Structure
 
 ```
 ATLAS-CLAUDE/
-├── agents/              ← 12 specialized Claude Code agents
-├── skills/              ← 5 skill definitions (used by agents internally)
-├── commands/            ← 5 slash commands for developers
-├── atlas.config.json    ← Configuration (copy to your project root)
-├── CLAUDE.md            ← Claude Code project guidance
-└── AGENTS.md            ← Agent reference table
+├── packages/
+│   ├── core/          ← ATLASEngine, memory, providers, agent runner
+│   ├── cli/           ← 25+ CLI commands
+│   ├── mcp/           ← 14 MCP tools for Claude Desktop
+│   └── vscode/        ← VS Code extension (sidebar, panel, status bar)
+├── apps/
+│   ├── atlas-server/  ← Express + Socket.IO + SQLite backend
+│   ├── telegram-bot/  ← Standalone Telegram bot
+│   ├── atlas-console/ ← React Native mobile app (Expo)
+│   └── atlas-web/     ← React web dashboard (Vite)
+├── agents/            ← 12 agent definitions
+├── commands/          ← Legacy slash commands
+├── docker-compose.yml
+└── .env.example
 ```
-
----
-
-## Estimated Monthly Cost (Starter Tier — Claude Only)
-
-| Usage | Approx. Cost |
-|---|---|
-| 1 complex project/week, solo developer | ~$50–80/mo |
-| Team of 5 developers | ~$250–400/mo |
-
-ATLAS reduces token spend on codebase reading by ~99% via `function-registry.json`.
-
----
-
-## Built on everything-claude-code
-
-ATLAS builds on the excellent [everything-claude-code](https://github.com/affaan-m/everything-claude-code) repository by affaan-m. The `atlas-orchestrator` automatically calls existing ECC agents (`planner`, `architect`, `tdd-guide`, `e2e-runner`, `security-reviewer`, `loop-operator`) when needed. Your existing ECC setup is unchanged — ATLAS adds orchestration and memory on top.
 
 ---
 

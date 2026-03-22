@@ -20,7 +20,6 @@ import { SessionBriefManager } from './memory/session-brief.js'
 import { ToolExecutor } from './tool-executor.js'
 import { FunctionRegistry } from './memory/function-registry.js'
 
-// Phase 3 command handlers
 import { runInit } from './commands/init.js'
 import { runFast } from './commands/fast.js'
 import { runNext } from './commands/next.js'
@@ -35,6 +34,7 @@ import { runDebug } from './commands/debug.js'
 import { runSessionReport } from './commands/session-report.js'
 import { runSeed, runBacklog, runNote } from './commands/seed-backlog-note.js'
 import { runAgents, runProfile } from './commands/agents-profile.js'
+import { runExport } from './commands/export.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -187,6 +187,9 @@ export class ATLASEngine {
 
       case 'profile':
         await runProfile(description ?? '', this.projectDir, options); break
+
+      case 'export':
+        await runExport(this.projectDir, options); break
 
       default:
         onProgress?.(`Unknown command: ${command}`)

@@ -1,10 +1,23 @@
-import { writeFile } from 'fs/promises'
+import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import type { ATLASRunOptions, RoutingTable, DiscussResult } from '../types.js'
 import { AgentRunner } from '../agent-runner.js'
 import { NervousSystem } from '../memory/nervous-system.js'
 import { GoalGuardian } from '../memory/goal-guardian.js'
 import { TaskManager } from '../memory/task-manager.js'
+
+/** Convert a feature description to a stable slug for file naming.
+ *  e.g. "Add OAuth login" → "add-oauth-login"
+ *  This allows atlas new / atlas enhance to auto-find the discuss context.
+ */
+function toSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 60)
+}
 
 export async function runDiscuss(
   description: string,
@@ -24,6 +37,7 @@ export async function runDiscuss(
   const goalGuardian = new GoalGuardian(projectDir)
   const taskManager = new TaskManager(projectDir)
   const sessionId = `discuss_${Date.now()}`
+  const slug = toSlug(description)
 
   const [goalSummary, taskSummary, decisions] = await Promise.all([
     goalGuardian.getContextSummary(),
@@ -72,10 +86,15 @@ QUESTIONS (answer these before planning):
 
   onAgentOutput?.('atlas-planner (discuss)', response.content)
 
-  const outputFile = path.join(projectDir, '.atlas', 'context', `discuss-${Date.now()}.md`)
+  // Persist to slug-named file so atlas new / atlas enhance can auto-inject context
+  const contextDir = path.join(projectDir, '.atlas', 'context')
+  await mkdir(contextDir, { recursive: true })
+
+  const outputFile = path.join(contextDir, `discuss-${slug}.md`)
   const md = `# Discussion: ${description}
 Date: ${new Date().toISOString()}
 Session: ${sessionId}
+Slug: ${slug}
 
 ## Request
 ${description}
@@ -97,8 +116,10 @@ ${response.content}
     .map(l => l.replace(/^\d+\.\s*/, '').split('—')[0]?.trim() ?? l)
 
   onProgress?.('')
-  onProgress?.(`Discussion saved to: .atlas/context/discuss-${sessionId}.md`)
-  onProgress?.(`Fill in your answers, then run: atlas new "${description}"`)
+  onProgress?.(`✓ Discussion saved to: .atlas/context/discuss-${slug}.md`)
+  onProgress?.('  Fill in your answers in that file, then run:')
+  onProgress?.(`  atlas new "${description}"`)
+  onProgress?.('  ATLAS will automatically load your answers before planning.')
 
   return {
     feature: description,

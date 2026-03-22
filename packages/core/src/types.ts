@@ -152,7 +152,7 @@ export interface ATLASRunOptions {
            'init' | 'fast' | 'next' | 'pause' | 'resume' |
            'doctor' | 'discuss' | 'verify' | 'ship' | 'review' |
            'map' | 'debug' | 'session-report' | 'seed' | 'backlog' |
-           'note' | 'milestone' | 'plan-preview' | 'agents' | 'profile'
+           'note' | 'milestone' | 'plan-preview' | 'agents' | 'profile' | 'export'
   description?: string
   projectDir: string
   onCheckpoint?: (checkpoint: Checkpoint) => Promise<string>

@@ -437,6 +437,19 @@ program
     await runATLAS('profile', name, opts)
   })
 
+// ── atlas export ──────────────────────────────────────────────────────────────
+program
+  .command('export')
+  .description('Export .atlas/ artifacts as a shareable markdown document (team handoffs, docs)')
+  .option('-d, --dir <directory>', 'Project directory', process.cwd())
+  .option('--output <path>', 'Output file path (default: .atlas/export-YYYY-MM-DD.md)')
+  .action(async (opts: { dir: string; output?: string }) => {
+    await runATLAS('export', undefined, {
+      ...opts,
+      extra: opts.output ? { output: opts.output } : undefined
+    })
+  })
+
 // ── atlas help ────────────────────────────────────────────────────────────────
 program
   .command('help')

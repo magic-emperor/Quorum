@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  atlas-server:
+    build:
+      context: ./apps/atlas-server
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_PATH=/data/atlas.db
+      - PUBLIC_URL=${PUBLIC_URL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    volumes:
+      - atlas-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  atlas-web:
+    build:
+      context: ./apps/atlas-web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - atlas-server
+    restart: unless-stopped
+
+volumes:
+  atlas-data:
