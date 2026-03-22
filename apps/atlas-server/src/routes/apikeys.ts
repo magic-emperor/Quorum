@@ -7,12 +7,16 @@ import { verifyToken, type AuthRequest } from '../middleware/auth.js'
 
 export const apiKeysRouter = Router()
 
+// Provider name is any valid env-var-style string (UPPER_CASE, underscores allowed).
+// This is intentionally open so users can add any future AI provider
+// without requiring a code change — e.g. TOGETHER_API_KEY, XAI_API_KEY,
+// OLLAMA_BASE_URL, COHERE_API_KEY, etc.
 const AddKeySchema = z.object({
-  provider: z.enum([
-    'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_AI_API_KEY',
-    'GROQ_API_KEY', 'DEEPSEEK_API_KEY', 'MISTRAL_API_KEY'
-  ]),
-  key: z.string().min(10)
+  provider: z.string()
+    .min(2)
+    .max(100)
+    .regex(/^[A-Z0-9_]+$/, 'Provider must be an UPPER_CASE env var name, e.g. ANTHROPIC_API_KEY'),
+  key: z.string().min(1)
 })
 
 // GET /api/keys — list user's configured providers (masked)
