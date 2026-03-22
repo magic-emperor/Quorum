@@ -91,6 +91,31 @@ authRouter.get('/telegram/link-token', verifyToken, (req: AuthRequest, res) => {
   })
 })
 
+// POST /api/auth/telegram/generate-link  (internal — called by the bot only)
+// Secured by JWT_SECRET header so only the bot process can call it
+authRouter.post('/telegram/generate-link', (req, res) => {
+  const secret = req.headers['x-bot-secret']
+  if (secret !== process.env['JWT_SECRET']) {
+    res.status(401).json({ error: 'Unauthorized' }); return
+  }
+  const { chat_id } = req.body as { chat_id: string }
+  if (!chat_id) { res.status(400).json({ error: 'chat_id required' }); return }
+
+  const token = nanoid(32)
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+
+  db.prepare(`
+    INSERT OR REPLACE INTO telegram_link_tokens (token, user_id, chat_id, expires_at)
+    VALUES (?, NULL, ?, ?)
+  `).run(token, chat_id, expiresAt)
+
+  const publicUrl = (process.env['PUBLIC_URL'] ?? 'http://localhost:3001').replace(/\/$/, '')
+  res.json({
+    url: `${publicUrl}/telegram-auth?token=${token}`,
+    expires_at: expiresAt
+  })
+})
+
 // POST /api/auth/telegram/link
 // Called from the TelegramAuth web page after user opens the link
 authRouter.post('/telegram/link', verifyToken, (req: AuthRequest, res) => {

@@ -36,18 +36,24 @@ export class SessionRunner {
     const autoSupportedCommands = ['new', 'enhance', 'fast']
     if (opts.auto && autoSupportedCommands.includes(command)) atlasArgs.push('--auto')
 
+    // ATLAS_SHOW_TERMINAL=1 → launch in a visible Windows cmd.exe window
+    // This lets you watch the raw terminal AND the browser stream simultaneously
+    const showTerminal = process.env['ATLAS_SHOW_TERMINAL'] === '1'
 
-    const child = spawn('atlas', atlasArgs, {
-      cwd: projectDir,
-      env: {
-        ...process.env,
-        ...userKeys,
-        ATLAS_SESSION_ID: this.sessionId,
-        ATLAS_SERVER_MODE: '1'
-      },
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true
-    })
+    const child = showTerminal
+      ? spawn('cmd.exe', ['/c', `start "ATLAS Session" cmd /k "atlas ${atlasArgs.join(' ')}"`], {
+          cwd: projectDir,
+          env: { ...process.env, ...userKeys, ATLAS_SESSION_ID: this.sessionId, ATLAS_SERVER_MODE: '1' },
+          shell: false,
+          detached: true
+        })
+      : spawn('atlas', atlasArgs, {
+          cwd: projectDir,
+          env: { ...process.env, ...userKeys, ATLAS_SESSION_ID: this.sessionId, ATLAS_SERVER_MODE: '1' },
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: true
+        })
+
 
     // Record PID in DB
     db.prepare("UPDATE sessions SET pid = ?, status = 'running', updated_at = datetime('now') WHERE id = ?")

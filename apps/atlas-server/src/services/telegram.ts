@@ -1,6 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api'
 import { db } from '../db/schema.js'
-import { signToken } from '../middleware/auth.js'
 
 let bot: TelegramBot | null = null
 
@@ -15,20 +14,19 @@ export function startTelegramBot(): void {
   bot = new TelegramBot(token, { polling: true })
   console.log('Telegram bot started')
 
-  // /start — welcome message
-  bot.onText(/\/start/, (msg) => {
-    bot!.sendMessage(msg.chat.id, [
-      '👋 Welcome to *ATLAS Console*!',
-      '',
-      'Commands:',
-      '/login — Link your ATLAS account',
-      '/status — Check current session status',
-      '/stop — Stop the running session',
+  // /start and /help — welcome message (plain text, no Markdown)
+  bot.onText(/\/(start|help)/, (msg) => {
+    bot!.sendMessage(msg.chat.id,
+      '👋 Welcome to ATLAS Console!\n\n' +
+      'Commands:\n' +
+      '/login — Link your ATLAS account\n' +
+      '/status — Check current session status\n' +
+      '/stop — Stop the running session\n' +
       '/help — Show this message'
-    ].join('\n'), { parse_mode: 'Markdown' })
+    )
   })
 
-  // /login — generate a one-time link for the user to open in browser
+  // /login — generate a secure one-time link the user opens in their browser
   bot.onText(/\/login/, async (msg) => {
     const chatId = msg.chat.id.toString()
 
@@ -40,23 +38,41 @@ export function startTelegramBot(): void {
     if (existing) {
       bot!.sendMessage(chatId,
         '✅ Your Telegram is already linked to an ATLAS account.\n' +
-        'Send /status to check your session or /help for commands.'
+        'Send /status to check your session.'
       )
       return
     }
 
-    const publicUrl = process.env['PUBLIC_URL'] ?? 'https://atlasconsole.app'
-    const linkUrl = `${publicUrl}/telegram-auth?chat_id=${chatId}`
+    try {
+      // Call the internal generate-link endpoint to create a secure DB-backed token
+      const serverUrl = `http://localhost:${process.env['PORT'] ?? '3001'}`
+      const resp = await fetch(`${serverUrl}/api/auth/telegram/generate-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-bot-secret': process.env['JWT_SECRET'] ?? ''
+        },
+        body: JSON.stringify({ chat_id: chatId })
+      })
 
-    bot!.sendMessage(chatId, [
-      '🔗 *Link your ATLAS account*',
-      '',
-      'Open this link in your browser and log in:',
-      linkUrl,
-      '',
-      '_Link expires in 10 minutes_'
-    ].join('\n'), { parse_mode: 'Markdown' })
+      const data = await resp.json() as { url?: string; error?: string }
+      if (!data.url) throw new Error(data.error ?? 'No URL returned')
+
+      // Send the link as plain text — never use parse_mode Markdown with URLs (underscores break it)
+      bot!.sendMessage(chatId,
+        '🔗 Link your ATLAS account\n\n' +
+        '1. Make sure you are logged into ATLAS Console:\n' +
+        '   http://localhost:3000   (use email + password)\n\n' +
+        '2. Then open this link:\n' +
+        data.url + '\n\n' +
+        'Link expires in 10 minutes.'
+      )
+    } catch (err) {
+      console.error('Telegram /login error:', err)
+      bot!.sendMessage(chatId, 'Error generating link. Make sure the ATLAS server is running and try again.')
+    }
   })
+
 
   // /status — show current session status
   bot.onText(/\/status/, (msg) => {
@@ -66,7 +82,7 @@ export function startTelegramBot(): void {
     ).get(chatId) as { user_id: string } | undefined
 
     if (!link) {
-      bot!.sendMessage(chatId, '❌ Not linked. Send /login to connect your account.')
+      bot!.sendMessage(chatId, '❌ Not linked yet. Send /login to connect your account.')
       return
     }
 
@@ -79,17 +95,17 @@ export function startTelegramBot(): void {
     } | undefined
 
     if (!session) {
-      bot!.sendMessage(chatId, 'No sessions found. Run `atlas new` from the CLI or console.')
+      bot!.sendMessage(chatId, 'No sessions yet. Run a command from the ATLAS Console web app.')
       return
     }
 
-    bot!.sendMessage(chatId, [
-      `📊 *Latest Session*`,
-      `Command: \`atlas ${session.command}\``,
-      `Description: ${session.description ?? '(none)'}`,
-      `Status: ${statusEmoji(session.status)} ${session.status}`,
+    bot!.sendMessage(chatId,
+      `📊 Latest Session\n` +
+      `Command: atlas ${session.command}\n` +
+      `Description: ${session.description ?? '(none)'}\n` +
+      `Status: ${statusEmoji(session.status)} ${session.status}\n` +
       `Started: ${new Date(session.created_at).toLocaleString()}`
-    ].join('\n'), { parse_mode: 'Markdown' })
+    )
   })
 
   // /stop — interrupt running session
@@ -116,15 +132,21 @@ export function startTelegramBot(): void {
     }
 
     if (session.pid) {
-      try {
-        process.kill(session.pid, 'SIGINT')
-      } catch { /* already exited */ }
+      try { process.kill(session.pid, 'SIGINT') } catch { /* already exited */ }
     }
 
     db.prepare("UPDATE sessions SET status = 'interrupted', updated_at = datetime('now') WHERE id = ?")
       .run(session.id)
 
     bot!.sendMessage(chatId, '🛑 Session interrupted.')
+  })
+
+  bot.on('polling_error', (err) => {
+    // Suppress connection resets (common on flaky networks) — only log real errors
+    const msg = (err as NodeJS.ErrnoException).message ?? ''
+    if (!msg.includes('ECONNRESET')) {
+      console.error('Telegram polling error:', msg)
+    }
   })
 
   bot.on('error', (err) => {
@@ -140,7 +162,7 @@ export async function notifyUser(userId: string, message: string): Promise<void>
   ).get(userId) as { chat_id: string } | undefined
 
   if (link) {
-    await bot.sendMessage(link.chat_id, message, { parse_mode: 'Markdown' })
+    await bot.sendMessage(link.chat_id, message)
   }
 }
 
