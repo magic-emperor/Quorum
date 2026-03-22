@@ -85,3 +85,15 @@ httpServer.listen(PORT, () => {
   console.log(`ATLAS Server running on port ${PORT}`)
   console.log(`Allowed origins: ${ALLOWED_ORIGINS.join(', ')}`)
 })
+
+httpServer.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Port ${PORT} is already in use.`)
+    console.error(`   Kill the existing process with:`)
+    console.error(`   PowerShell: Get-NetTCPConnection -LocalPort ${PORT} -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`)
+    console.error(`   Then run npm run dev again.\n`)
+  } else {
+    console.error('Server error:', err)
+  }
+  process.exit(1)
+})
