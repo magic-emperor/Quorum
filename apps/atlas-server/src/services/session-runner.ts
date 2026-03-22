@@ -37,22 +37,37 @@ export class SessionRunner {
     if (opts.auto && autoSupportedCommands.includes(command)) atlasArgs.push('--auto')
 
     // ATLAS_SHOW_TERMINAL=1 → launch in a visible Windows cmd.exe window
-    // This lets you watch the raw terminal AND the browser stream simultaneously
     const showTerminal = process.env['ATLAS_SHOW_TERMINAL'] === '1'
 
-    const child = showTerminal
-      ? spawn('cmd.exe', ['/c', `start "ATLAS Session" cmd /k "atlas ${atlasArgs.join(' ')}"`], {
+    let child: ReturnType<typeof spawn>
+    if (showTerminal) {
+      if (process.platform === 'win32') {
+        child = spawn('cmd.exe', ['/c', `start "ATLAS Session" cmd /k "atlas ${atlasArgs.join(' ')}"`], {
           cwd: projectDir,
           env: { ...process.env, ...userKeys, ATLAS_SESSION_ID: this.sessionId, ATLAS_SERVER_MODE: '1' },
-          shell: false,
-          detached: true
+          shell: false, detached: true
         })
-      : spawn('atlas', atlasArgs, {
+      } else if (process.platform === 'darwin') {
+        child = spawn('osascript', ['-e', `tell app "Terminal" to do script "cd '${projectDir}' && atlas ${atlasArgs.join(' ')}"`], {
           cwd: projectDir,
           env: { ...process.env, ...userKeys, ATLAS_SESSION_ID: this.sessionId, ATLAS_SERVER_MODE: '1' },
-          stdio: ['pipe', 'pipe', 'pipe'],
-          shell: true
+          shell: false, detached: true
         })
+      } else {
+        child = spawn('x-terminal-emulator', ['-e', `bash -c "atlas ${atlasArgs.join(' ')}; exec bash"`], {
+          cwd: projectDir,
+          env: { ...process.env, ...userKeys, ATLAS_SESSION_ID: this.sessionId, ATLAS_SERVER_MODE: '1' },
+          shell: false, detached: true
+        })
+      }
+    } else {
+      child = spawn('atlas', atlasArgs, {
+        cwd: projectDir,
+        env: { ...process.env, ...userKeys, ATLAS_SESSION_ID: this.sessionId, ATLAS_SERVER_MODE: '1' },
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true
+      })
+    }
 
 
     // Record PID in DB

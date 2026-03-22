@@ -1,5 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api'
+import { nanoid } from 'nanoid'
 import { db } from '../db/schema.js'
+import { SessionRunner } from './session-runner.js'
 
 let bot: TelegramBot | null = null
 
@@ -19,10 +21,63 @@ export function startTelegramBot(): void {
     bot!.sendMessage(msg.chat.id,
       '👋 Welcome to ATLAS Console!\n\n' +
       'Commands:\n' +
-      '/login — Link your ATLAS account\n' +
+      '/run <cmd> — Run a command (e.g. /run doctor)\n' +
       '/status — Check current session status\n' +
       '/stop — Stop the running session\n' +
+      '/login — Link your ATLAS account\n' +
       '/help — Show this message'
+    )
+  })
+
+  // /run <command> — execute a command in the last used project directory
+  bot.onText(/\/run\s+(.+)/, async (msg, match) => {
+    const chatId = msg.chat.id.toString()
+    const link = db.prepare(
+      'SELECT user_id FROM telegram_links WHERE chat_id = ?'
+    ).get(chatId) as { user_id: string } | undefined
+
+    if (!link) {
+      bot!.sendMessage(chatId, '❌ Not linked. Send /login first.')
+      return
+    }
+
+    const commandStr = match?.[1]?.trim()
+    if (!commandStr) return
+
+    // Find the user's most recently used project directory
+    const lastSession = db.prepare(`
+      SELECT project_dir FROM sessions
+      WHERE user_id = ? AND project_dir IS NOT NULL
+      ORDER BY created_at DESC LIMIT 1
+    `).get(link.user_id) as { project_dir: string } | undefined
+
+    const projectDir = lastSession?.project_dir
+    if (!projectDir) {
+      bot!.sendMessage(chatId, '❌ No previous project directory found.\nPlease run your first command from the Web UI to set a default directory.')
+      return
+    }
+
+    const sessionId = nanoid()
+    const description = `Triggered from Telegram: atlas ${commandStr}`
+
+    db.prepare(`
+      INSERT INTO sessions (id, user_id, command, description, status, project_dir)
+      VALUES (?, ?, ?, ?, 'pending', ?)
+    `).run(sessionId, link.user_id, commandStr, description, projectDir)
+
+    // Run automatically with --auto since they aren't at the keyboard
+    const runner = new SessionRunner(sessionId, link.user_id)
+    runner.start(commandStr, description, projectDir, { auto: true }).catch(err => {
+      db.prepare("UPDATE sessions SET status = 'error', updated_at = datetime('now') WHERE id = ?").run(sessionId)
+      console.error(`Telegram session ${sessionId} error:`, err)
+    })
+
+    const publicUrl = process.env['PUBLIC_URL'] ?? 'http://localhost:3000'
+    bot!.sendMessage(chatId, 
+      `🚀 Started: atlas ${commandStr}\n` +
+      `📁 Dir: ${projectDir}\n\n` +
+      `Monitor live output here:\n` +
+      `${publicUrl.replace(/\/$/, '')}/session/${sessionId}`
     )
   })
 
