@@ -5,8 +5,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    strictPort: true,   // Error immediately if 3000 is taken — never silently steal 3001
     proxy: {
-      '/api': { target: 'http://localhost:3001', changeOrigin: true }
+      '/api': { target: 'http://localhost:3001', changeOrigin: true },
+      '/socket.io': { target: 'http://localhost:3001', ws: true, changeOrigin: true }
     }
   }
 })
+
