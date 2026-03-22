@@ -42,9 +42,11 @@ export class SessionRunner {
       atlasArgs = command
     }
     atlasArgs.push('--dir', projectDir)
-    // Only pass --auto for commands that accept it (new, enhance, fast)
-    const autoSupportedCommands = ['new', 'enhance', 'fast']
-    if (opts.auto && autoSupportedCommands.includes(command)) atlasArgs.push('--auto')
+    // Only pass --no-checkpoints for commands that accept it
+    const cmdStart = atlasArgs[0]
+    if (opts.auto && cmdStart === 'new') {
+      atlasArgs.push('--no-checkpoints')
+    }
 
     // ATLAS_SHOW_TERMINAL=1 → launch in a visible Windows cmd.exe window
     const showTerminal = process.env['ATLAS_SHOW_TERMINAL'] === '1'
