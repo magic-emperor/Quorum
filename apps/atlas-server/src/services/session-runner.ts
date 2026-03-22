@@ -32,7 +32,10 @@ export class SessionRunner {
     const atlasArgs = [command]
     if (description) atlasArgs.push(description)
     atlasArgs.push('--dir', projectDir)
-    if (opts.auto) atlasArgs.push('--auto')
+    // Only pass --auto for commands that accept it (new, enhance, fast)
+    const autoSupportedCommands = ['new', 'enhance', 'fast']
+    if (opts.auto && autoSupportedCommands.includes(command)) atlasArgs.push('--auto')
+
 
     const child = spawn('atlas', atlasArgs, {
       cwd: projectDir,
