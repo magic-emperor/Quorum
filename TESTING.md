@@ -7,16 +7,22 @@
 | atlas-server (API + Socket.IO) | http://localhost:3001 | Start with `npm run dev` in `apps/atlas-server/` |
 | atlas-web (React dashboard) | http://localhost:3000 | Start with `npx vite` in `apps/atlas-web/` |
 
-**Starting both:**
+**Starting both (do in this order):**
 ```bash
-# Terminal 1 — Server
-cd apps/atlas-server
-npx tsx src/index.ts
+# If you see EADDRINUSE errors, kill stale node processes first:
+# PowerShell:
+Get-NetTCPConnection -LocalPort 3000,3001 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 
-# Terminal 2 — Web
+# Terminal 1 — Start server FIRST
+cd apps/atlas-server
+npm run dev
+
+# Terminal 2 — Start web AFTER (once server shows "running on port 3001")
 cd apps/atlas-web
-npx vite --port 3000
+npx vite --port 3000 --strictPort
 ```
+
+> `--strictPort` makes Vite fail loudly if 3000 is taken, so it can never accidentally steal port 3001 and create a proxy loop.
 
 ---
 
