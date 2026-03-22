@@ -42,10 +42,10 @@ export class SessionRunner {
     let child: ReturnType<typeof spawn>
     if (showTerminal) {
       if (process.platform === 'win32') {
-        child = spawn('cmd.exe', ['/c', `start "ATLAS Session" cmd /k "atlas ${atlasArgs.join(' ')}"`], {
+        child = spawn(`start "ATLAS" cmd.exe /k "atlas ${atlasArgs.join(' ')}"`, {
           cwd: projectDir,
           env: { ...process.env, ...userKeys, ATLAS_SESSION_ID: this.sessionId, ATLAS_SERVER_MODE: '1' },
-          shell: false, detached: true
+          shell: true, detached: true
         })
       } else if (process.platform === 'darwin') {
         child = spawn('osascript', ['-e', `tell app "Terminal" to do script "cd '${projectDir}' && atlas ${atlasArgs.join(' ')}"`], {
