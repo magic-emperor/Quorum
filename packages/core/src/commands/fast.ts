@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import type { ATLASRunOptions, RoutingTable } from '../types.js'
+import type { QUORUMRunOptions, RoutingTable } from '../types.js'
 import { AgentRunner } from '../agent-runner.js'
 import { NervousSystem } from '../memory/nervous-system.js'
 import { TaskManager } from '../memory/task-manager.js'
@@ -15,7 +15,7 @@ export async function runFast(
   projectDir: string,
   agentsDir: string,
   routingTable: RoutingTable,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress, onAgentOutput } = options
 
@@ -30,7 +30,7 @@ export async function runFast(
   const stack = await nervousSystem.readStack()
   const taskSummary = await taskManager.getContextSummary()
 
-  const goalPath = path.join(projectDir, '.atlas', 'goal.md')
+  const goalPath = path.join(projectDir, '.quorum', 'goal.md')
   let goalContext = ''
   if (existsSync(goalPath)) {
     const raw = await readFile(goalPath, 'utf-8')
@@ -40,7 +40,7 @@ export async function runFast(
   // Step 1: Critic pre-check (fast)
   onProgress?.('Running quick assumption check...')
   const criticResponse = await agentRunner.run({
-    agentName: 'atlas-critic',
+    agentName: 'quorum-critic',
     userMessage: `Quick check: is this task safe to execute directly without planning?
 Task: ${description}
 Project goal: ${goalContext}
@@ -61,7 +61,7 @@ Output: FAST_OK or NEEDS_FULL_PIPELINE with brief reason.`,
 
   if (criticResponse.content.includes('NEEDS_FULL_PIPELINE')) {
     onProgress?.('')
-    onProgress?.('This task needs the full pipeline — routing to atlas new...')
+    onProgress?.('This task needs the full pipeline — routing to quorum new...')
     onProgress?.(criticResponse.content)
     throw new Error('NEEDS_FULL_PIPELINE')
   }
@@ -86,7 +86,7 @@ Output: FAST_OK or NEEDS_FULL_PIPELINE with brief reason.`,
 
   // Step 3: Execute with backend architect (acts as general builder in fast mode)
   const buildResponse = await agentRunner.run({
-    agentName: 'atlas-backend-architect',
+    agentName: 'quorum-backend-architect',
     userMessage: `Fast execution — implement this directly:
 ${description}
 
@@ -106,7 +106,7 @@ Rules for fast mode:
     onProgress
   })
 
-  onAgentOutput?.('atlas-backend-architect', buildResponse.content)
+  onAgentOutput?.('quorum-backend-architect', buildResponse.content)
 
   // Step 4: Update task as complete
   if (!options.noSave) {
@@ -128,7 +128,7 @@ Rules for fast mode:
       id: `a_${sessionId}_1`,
       type: 'action',
       what: `Fast task executed: ${description}`,
-      agent: 'atlas-fast',
+      agent: 'quorum-fast',
       status: 'completed',
       output: buildResponse.content.slice(0, 200),
       session: sessionId,

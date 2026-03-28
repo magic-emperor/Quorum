@@ -1,17 +1,19 @@
 {
-  "name": "atlas",
-  "version": "1.0.0",
+  "name": "quorum",
+  "version": "1.1.0",
   "private": true,
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
+    "setup": "npx tsx scripts/setup.ts",
     "build": "npm run build --workspaces --if-present",
     "dev:cli": "npm run dev -w packages/cli",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint packages/*/src/**/*.ts"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",

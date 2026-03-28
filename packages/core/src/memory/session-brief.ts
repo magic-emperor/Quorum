@@ -16,7 +16,7 @@ export class SessionBriefManager {
     private planManager: PlanManager,
     private nervousSystem: NervousSystem
   ) {
-    this.briefPath = path.join(projectDir, '.atlas', 'context', 'session-brief.md')
+    this.briefPath = path.join(projectDir, '.quorum', 'context', 'session-brief.md')
   }
 
   // ─── Generate and save brief at session start ─────────────────────────────────

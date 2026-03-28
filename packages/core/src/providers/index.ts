@@ -1,4 +1,4 @@
-import type { ATLASConfig, RoutingTable, ResolvedModel } from '../types.js'
+import type { QUORUMConfig, RoutingTable, ResolvedModel } from '../types.js'
 import { AnthropicProvider } from './anthropic.js'
 import { OpenAIProvider, GroqProvider, DeepSeekProvider } from './openai.js'
 import { GoogleProvider } from './google.js'
@@ -33,13 +33,13 @@ export function buildProvider(model: string, provider: string): BaseProvider {
     case 'local':
       return new OllamaProvider(model)
     default:
-      throw new Error(`Unknown provider: "${provider}". Check atlas.config.json auto_provider_selection.`)
+      throw new Error(`Unknown provider: "${provider}". Check quorum.config.json auto_provider_selection.`)
   }
 }
 
 // Detect which providers are available based on env vars + Ollama check.
 //
-// explicitlyDisabled: providers where the key in atlas.config.json is ""
+// explicitlyDisabled: providers where the key in quorum.config.json is ""
 //   (empty string = user explicitly says "don't use this provider")
 //   This takes priority over env vars so users can opt-out of system env keys.
 export async function detectAvailableProviders(
@@ -80,29 +80,32 @@ export async function detectAvailableProviders(
 
 // ─── Agent tier definitions ───────────────────────────────────────────────────
 // Each agent belongs to a quality tier: smart | balanced | fast
-// ATLAS auto-routes agents to the best available model for their tier.
+// QUORUM auto-routes agents to the best available model for their tier.
 
 const AGENT_TIERS: Record<string, 'smart' | 'balanced' | 'fast'> = {
-  'atlas-orchestrator':        'smart',
-  'atlas-backend-architect':   'smart',
-  'atlas-design-architect':    'smart',
-  'atlas-planner':             'smart',
+  'quorum-orchestrator':        'smart',
+  'quorum-backend-architect':   'smart',
+  'quorum-design-architect':    'smart',
+  'quorum-planner':             'smart',
 
-  'atlas-frontend-builder':    'balanced',
-  'atlas-integration':         'balanced',
-  'atlas-testing':             'balanced',
-  'atlas-nervous-system':      'balanced',
-  'atlas-backend-validator':   'balanced',
-  'atlas-design-validator':    'balanced',
+  'quorum-chat':                'balanced',
+  'quorum-backend-builder':     'balanced',
+  'quorum-frontend-builder':    'balanced',
+  'quorum-integration':         'balanced',
+  'quorum-testing':             'balanced',
+  'quorum-nervous-system':      'balanced',
+  'quorum-backend-validator':   'balanced',
+  'quorum-design-validator':    'balanced',
 
-  'atlas-classifier':          'fast',
-  'atlas-critic':              'fast',
-  'atlas-scaling':             'fast',
-  'atlas-task-manager':        'fast',
+  'quorum-coder':               'fast',
+  'quorum-classifier':          'fast',
+  'quorum-critic':              'fast',
+  'quorum-scaling':             'fast',
+  'quorum-task-manager':        'fast',
 }
 
 // ─── Default model names per provider per tier ────────────────────────────────
-// These can all be overridden by model_preferences in atlas.config.json.
+// These can all be overridden by model_preferences in quorum.config.json.
 
 interface ProviderModels {
   smart: string
@@ -158,7 +161,7 @@ const TIER_ORDER: Record<'smart' | 'balanced' | 'fast', string[]> = {
 function resolveModel(
   provider: string,
   tier: 'smart' | 'balanced' | 'fast',
-  prefs?: ATLASConfig['model_preferences']
+  prefs?: QUORUMConfig['model_preferences']
 ): string {
   // Check user overrides first
   if (prefs) {
@@ -173,7 +176,7 @@ function resolveModel(
 
 // ─── Build routing table ─────────────────────────────────────────────────────
 
-export async function buildRoutingTable(config: ATLASConfig): Promise<RoutingTable> {
+export async function buildRoutingTable(config: QUORUMConfig): Promise<RoutingTable> {
   // 1. Promote api_keys from config into process.env
   //    (env vars already set take priority — we never overwrite them)
   const keyMap: Record<string, string | undefined> = {
@@ -194,7 +197,7 @@ export async function buildRoutingTable(config: ATLASConfig): Promise<RoutingTab
   }
 
   // 2. Build the "explicitly disabled" set:
-  //    any provider whose key is set to "" in atlas.config.json is excluded,
+  //    any provider whose key is set to "" in quorum.config.json is excluded,
   //    even if the env var is set (e.g. ANTHROPIC_API_KEY in system environment)
   const explicitlyDisabled = new Set<string>()
   const apiKeys = config.api_keys
@@ -286,11 +289,11 @@ export async function buildRoutingTable(config: ATLASConfig): Promise<RoutingTab
   const availableList = Array.from(available)
   notes.push(`Active providers: ${availableList.join(', ')}`)
 
-  const smartProvider = table['atlas-orchestrator']
+  const smartProvider = table['quorum-orchestrator']
   if (smartProvider) {
     notes.push(`Smart tier (orchestrator/planner): ${smartProvider.provider}/${smartProvider.model}`)
   }
-  const fastProvider = table['atlas-classifier']
+  const fastProvider = table['quorum-classifier']
   if (fastProvider) {
     notes.push(`Fast tier (classifier/critic): ${fastProvider.provider}/${fastProvider.model}`)
   }

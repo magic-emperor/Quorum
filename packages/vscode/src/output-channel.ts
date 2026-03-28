@@ -1,14 +1,14 @@
 import * as vscode from 'vscode'
 
 /**
- * Manages the ATLAS output channel — the dedicted panel where all
+ * Manages the QUORUM output channel — the dedicted panel where all
  * agent output, progress messages, and session logs appear.
  */
-export class ATLASOutputChannel {
+export class QUORUMOutputChannel {
   private channel: vscode.OutputChannel
 
   constructor() {
-    this.channel = vscode.window.createOutputChannel('ATLAS')
+    this.channel = vscode.window.createOutputChannel('QUORUM')
   }
 
   get raw(): vscode.OutputChannel {
@@ -26,7 +26,7 @@ export class ATLASOutputChannel {
   header(title: string): void {
     this.channel.appendLine('')
     this.channel.appendLine(`  ══════════════════════════════════════`)
-    this.channel.appendLine(`  ATLAS — ${title}`)
+    this.channel.appendLine(`  QUORUM — ${title}`)
     this.channel.appendLine(`  ══════════════════════════════════════`)
   }
 

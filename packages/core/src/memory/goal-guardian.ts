@@ -8,7 +8,7 @@ export class GoalGuardian {
   private cachedGoal: ProjectGoal | null = null
 
   constructor(private projectDir: string) {
-    this.goalPath = path.join(projectDir, '.atlas', 'goal.md')
+    this.goalPath = path.join(projectDir, '.quorum', 'goal.md')
   }
 
   // ─── Existence ──────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ export class GoalGuardian {
       return {
         in_scope: true,
         confidence: 'low',
-        reasoning: 'No goal.md found — cannot verify scope. Proceeding but recommend running atlas init.',
+        reasoning: 'No goal.md found — cannot verify scope. Proceeding but recommend running quorum init.',
         recommendation: 'PROCEED'
       }
     }
@@ -104,7 +104,7 @@ export class GoalGuardian {
 
   async getContextSummary(): Promise<string> {
     const goal = await this.read()
-    if (!goal) return 'No goal.md defined yet. Run atlas init to create one.'
+    if (!goal) return 'No goal.md defined yet. Run quorum init to create one.'
 
     return `PROJECT GOAL: ${goal.what}
 WHY: ${goal.why}
@@ -169,7 +169,7 @@ CURRENT MILESTONE: ${goal.milestones[0]?.name ?? 'MVP'}`
 <!-- Written ONCE by human before anything is built.
      AI agents NEVER modify this file.
      Only a human may update the scope.
-     Every ATLAS agent reads this at session start. -->
+     Every QUORUM agent reads this at session start. -->
 
 ## What We Are Building
 ${goal.what}

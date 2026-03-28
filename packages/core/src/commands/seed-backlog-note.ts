@@ -1,16 +1,16 @@
 import { readFile, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import type { ATLASRunOptions, Seed, BacklogItem } from '../types.js'
+import type { QUORUMRunOptions, Seed, BacklogItem } from '../types.js'
 
 export async function runSeed(
   idea: string,
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress } = options
-  const seedsPath = path.join(projectDir, '.atlas', 'SEEDS.md')
-  const seedsJsonPath = path.join(projectDir, '.atlas', 'nervous-system', 'seeds.json')
+  const seedsPath = path.join(projectDir, '.quorum', 'SEEDS.md')
+  const seedsJsonPath = path.join(projectDir, '.quorum', 'nervous-system', 'seeds.json')
 
   const seed: Seed = {
     id: `seed_${Date.now()}`,
@@ -46,11 +46,11 @@ export async function runBacklog(
   subcommand: string,
   description: string,
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress } = options
-  const backlogPath = path.join(projectDir, '.atlas', 'BACKLOG.md')
-  const backlogJsonPath = path.join(projectDir, '.atlas', 'nervous-system', 'backlog.json')
+  const backlogPath = path.join(projectDir, '.quorum', 'BACKLOG.md')
+  const backlogJsonPath = path.join(projectDir, '.quorum', 'nervous-system', 'backlog.json')
 
   const loadBacklog = async (): Promise<BacklogItem[]> => {
     if (!existsSync(backlogJsonPath)) return []
@@ -94,7 +94,7 @@ ${items.filter(i => i.status === 'dismissed').map(i => `- ${i.description}`).joi
       items.push(item)
       await saveBacklog(items)
       onProgress?.(`Added to backlog: "${description}"`)
-      onProgress?.(`Use atlas backlog list to see all backlog items.`)
+      onProgress?.(`Use quorum backlog list to see all backlog items.`)
       break
     }
 
@@ -111,7 +111,7 @@ ${items.filter(i => i.status === 'dismissed').map(i => `- ${i.description}`).joi
         onProgress?.(`  ${i + 1}. [${item.priority}] ${item.description}`)
       })
       onProgress?.('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-      onProgress?.('Use atlas backlog promote <number> to move to active tasks.')
+      onProgress?.('Use quorum backlog promote <number> to move to active tasks.')
       break
     }
 
@@ -127,22 +127,22 @@ ${items.filter(i => i.status === 'dismissed').map(i => `- ${i.description}`).joi
       item.promoted_to = 'pending task creation'
       await saveBacklog(items)
       onProgress?.(`Promoted: "${item.description}"`)
-      onProgress?.(`Now run: atlas new "${item.description}"`)
+      onProgress?.(`Now run: quorum new "${item.description}"`)
       break
     }
 
     default:
-      onProgress?.('Usage: atlas backlog [add|list|promote] [description/number]')
+      onProgress?.('Usage: quorum backlog [add|list|promote] [description/number]')
   }
 }
 
 export async function runNote(
   text: string,
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress } = options
-  const notesPath = path.join(projectDir, '.atlas', 'NOTES.md')
+  const notesPath = path.join(projectDir, '.quorum', 'NOTES.md')
 
   const existing = existsSync(notesPath)
     ? await readFile(notesPath, 'utf-8')
@@ -151,5 +151,5 @@ export async function runNote(
   const entry = `## ${new Date().toISOString().split('T')[0]!} — ${new Date().toLocaleTimeString()}\n${text}\n\n---\n`
   await writeFile(notesPath, existing + entry, 'utf-8')
 
-  onProgress?.(`Note saved to .atlas/NOTES.md`)
+  onProgress?.(`Note saved to .quorum/NOTES.md`)
 }

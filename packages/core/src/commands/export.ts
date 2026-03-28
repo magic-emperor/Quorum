@@ -1,36 +1,36 @@
 import { readFile, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import type { ATLASRunOptions } from '../types.js'
+import type { QUORUMRunOptions } from '../types.js'
 
 /**
- * atlas export — generates a single shareable markdown document
- * from all .atlas/ artifacts: task.md, plan, session brief, BUGS.md,
+ * quorum export — generates a single shareable markdown document
+ * from all .quorum/ artifacts: task.md, plan, session brief, BUGS.md,
  * DEVGUIDE.md, and decisions.json.
  *
  * Useful for team handoffs, sprint documentation, and onboarding.
  */
 export async function runExport(
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress } = options
-  const atlasDir = path.join(projectDir, '.atlas')
+  const quorumDir = path.join(projectDir, '.quorum')
   const outputPath = options.extra?.['output'] ??
-    path.join(atlasDir, `export-${new Date().toISOString().slice(0, 10)}.md`)
+    path.join(quorumDir, `export-${new Date().toISOString().slice(0, 10)}.md`)
 
   onProgress?.('Compiling session export...')
 
   const sections: string[] = []
 
   // Header
-  sections.push(`# ATLAS Session Export`)
+  sections.push(`# QUORUM Session Export`)
   sections.push(`Generated: ${new Date().toISOString()}`)
   sections.push(`Project: ${path.basename(projectDir)}`)
   sections.push('')
 
   // Goal
-  const goalPath = path.join(atlasDir, 'goal.md')
+  const goalPath = path.join(quorumDir, 'goal.md')
   if (existsSync(goalPath)) {
     const goal = await readFile(goalPath, 'utf-8')
     sections.push('---')
@@ -40,7 +40,7 @@ export async function runExport(
   }
 
   // Implementation Plan
-  const planPath = path.join(atlasDir, 'implementation-plan.md')
+  const planPath = path.join(quorumDir, 'implementation-plan.md')
   if (existsSync(planPath)) {
     const plan = await readFile(planPath, 'utf-8')
     sections.push('---')
@@ -51,7 +51,7 @@ export async function runExport(
   }
 
   // Task summary
-  const taskPath = path.join(atlasDir, 'task.md')
+  const taskPath = path.join(quorumDir, 'task.md')
   if (existsSync(taskPath)) {
     const tasks = await readFile(taskPath, 'utf-8')
     sections.push('---')
@@ -62,7 +62,7 @@ export async function runExport(
   }
 
   // Session brief (compressed context)
-  const briefPath = path.join(atlasDir, 'session-brief.md')
+  const briefPath = path.join(quorumDir, 'session-brief.md')
   if (existsSync(briefPath)) {
     const brief = await readFile(briefPath, 'utf-8')
     sections.push('---')
@@ -72,8 +72,8 @@ export async function runExport(
     onProgress?.('  ✓ session-brief.md')
   }
 
-  // Dev guide (onboarding docs from atlas map)
-  const devguidePath = path.join(atlasDir, 'DEVGUIDE.md')
+  // Dev guide (onboarding docs from quorum map)
+  const devguidePath = path.join(quorumDir, 'DEVGUIDE.md')
   if (existsSync(devguidePath)) {
     const devguide = await readFile(devguidePath, 'utf-8')
     sections.push('---')
@@ -84,7 +84,7 @@ export async function runExport(
   }
 
   // Bug log
-  const bugsPath = path.join(atlasDir, 'BUGS.md')
+  const bugsPath = path.join(quorumDir, 'BUGS.md')
   if (existsSync(bugsPath)) {
     const bugs = await readFile(bugsPath, 'utf-8')
     sections.push('---')
@@ -95,7 +95,7 @@ export async function runExport(
   }
 
   // Key architectural decisions (from nervous system)
-  const decisionsPath = path.join(atlasDir, 'nervous-system', 'decisions.json')
+  const decisionsPath = path.join(quorumDir, 'nervous-system', 'decisions.json')
   if (existsSync(decisionsPath)) {
     try {
       const raw = await readFile(decisionsPath, 'utf-8')
@@ -119,7 +119,7 @@ export async function runExport(
   }
 
   // Open questions
-  const questionsPath = path.join(atlasDir, 'nervous-system', 'open-questions.json')
+  const questionsPath = path.join(quorumDir, 'nervous-system', 'open-questions.json')
   if (existsSync(questionsPath)) {
     try {
       const raw = await readFile(questionsPath, 'utf-8')

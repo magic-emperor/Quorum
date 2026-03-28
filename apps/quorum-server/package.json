@@ -1,0 +1,38 @@
+{
+  "name": "@quorum/server",
+  "version": "1.1.0",
+  "description": "QUORUM Console backend server — authentication, session management, real-time streaming",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "npx tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@quorum/core": "file:../../packages/core",
+    "@quorum/collaboration": "file:../../packages/collaboration",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.0.7",
+    "node-telegram-bot-api": "^0.66.0",
+    "socket.io": "^4.7.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.11.0",
+    "@types/node-telegram-bot-api": "^0.64.3",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

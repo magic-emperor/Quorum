@@ -1,18 +1,18 @@
 import { writeFile, readFile, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import type { ATLASRunOptions, HandoffState } from '../types.js'
+import type { QUORUMRunOptions, HandoffState } from '../types.js'
 import { TaskManager } from '../memory/task-manager.js'
 
 export async function runPause(
   projectDir: string,
-  options: ATLASRunOptions,
+  options: QUORUMRunOptions,
   currentState?: Partial<HandoffState>
 ): Promise<void> {
   const { onProgress } = options
 
-  const handoffPath = path.join(projectDir, '.atlas', 'HANDOFF.md')
-  const handoffJsonPath = path.join(projectDir, '.atlas', 'HANDOFF.json')
+  const handoffPath = path.join(projectDir, '.quorum', 'HANDOFF.md')
+  const handoffJsonPath = path.join(projectDir, '.quorum', 'HANDOFF.json')
   const sessionId = `session_${Date.now()}`
 
   const taskManager = new TaskManager(projectDir)
@@ -32,12 +32,12 @@ export async function runPause(
       in_progress_tasks: inProgress.map(t => t.id),
       task_summary: await taskManager.getContextSummary()
     }),
-    resume_instruction: `Run: atlas resume\nThis will load the paused state and continue from: ${currentState?.current_step ?? 'last known step'}`
+    resume_instruction: `Run: quorum resume\nThis will load the paused state and continue from: ${currentState?.current_step ?? 'last known step'}`
   }
 
   await writeFile(handoffJsonPath, JSON.stringify(handoff, null, 2), 'utf-8')
 
-  const md = `# ATLAS Paused Session
+  const md = `# QUORUM Paused Session
 Session: ${handoff.session_id}
 Paused: ${handoff.paused_at}
 
@@ -58,7 +58,7 @@ ${inProgress.map(t => `- ${t.id}: ${t.title}`).join('\n') || '(none)'}
 
 ## To Resume
 \`\`\`
-atlas resume
+quorum resume
 \`\`\`
 
 ---
@@ -69,22 +69,22 @@ _State saved automatically. Safe to close terminal._
 
   onProgress?.('')
   onProgress?.('Session paused cleanly.')
-  onProgress?.(`State saved to .atlas/HANDOFF.md`)
-  onProgress?.('To resume: atlas resume')
+  onProgress?.(`State saved to .quorum/HANDOFF.md`)
+  onProgress?.('To resume: quorum resume')
 }
 
 export async function runResume(
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<{ shouldRun: true; handoff: HandoffState } | { shouldRun: false }> {
   const { onProgress, onCheckpoint } = options
 
-  const handoffJsonPath = path.join(projectDir, '.atlas', 'HANDOFF.json')
-  const handoffMdPath = path.join(projectDir, '.atlas', 'HANDOFF.md')
+  const handoffJsonPath = path.join(projectDir, '.quorum', 'HANDOFF.json')
+  const handoffMdPath = path.join(projectDir, '.quorum', 'HANDOFF.md')
 
   if (!existsSync(handoffJsonPath)) {
     onProgress?.('No paused session found.')
-    onProgress?.('Use atlas next to see what to do.')
+    onProgress?.('Use quorum next to see what to do.')
     return { shouldRun: false }
   }
 

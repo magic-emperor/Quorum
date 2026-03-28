@@ -3,8 +3,8 @@ import { existsSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import type {
-  ATLASConfig,
-  ATLASRunOptions,
+  QUORUMConfig,
+  QUORUMRunOptions,
   RoutingTable,
   Checkpoint,
   ClassificationResult,
@@ -39,12 +39,12 @@ import { runExport } from './commands/export.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const CONFIG_PATHS = ['atlas.config.json', '.atlas/config.json']
+const CONFIG_PATHS = ['quorum.config.json', '.quorum/config.json']
 
-type Hooks = Pick<ATLASRunOptions, 'onProgress' | 'onCheckpoint' | 'onAgentOutput'>
+type Hooks = Pick<QUORUMRunOptions, 'onProgress' | 'onCheckpoint' | 'onAgentOutput'>
 
-export class ATLASEngine {
-  private config!: ATLASConfig
+export class QUORUMEngine {
+  private config!: QUORUMConfig
   private routingTable!: RoutingTable
   private ns!: NervousSystem
   private goalGuardian!: GoalGuardian
@@ -75,7 +75,7 @@ export class ATLASEngine {
     if (this.initialized) return
     this.config = await this.loadConfig()
 
-    // Promote api_keys from atlas.config.json into process.env
+    // Promote api_keys from quorum.config.json into process.env
     // (env vars always take priority — only set if env var is not already set)
     if (this.config.api_keys) {
       const keys = this.config.api_keys as Record<string, string>
@@ -114,12 +114,12 @@ export class ATLASEngine {
     this.initialized = true
   }
 
-  async run(options: ATLASRunOptions): Promise<void> {
+  async run(options: QUORUMRunOptions): Promise<void> {
     await this.initialize()
 
     const { command, description, onProgress } = options
 
-    onProgress?.(`ATLAS — session ${this.sessionId}`)
+    onProgress?.(`QUORUM — session ${this.sessionId}`)
 
     // Show session notes from routing table (active providers etc.)
     for (const note of this.routingTable.session_notes) {
@@ -196,23 +196,97 @@ export class ATLASEngine {
     }
   }
 
-  // ── atlas new ───────────────────────────────────────────────────────────────
+  // ── quorum chat ───────────────────────────────────────────────────────────────
+
+  /**
+   * Process a single turn of an interactive chat session.
+   * Call repeatedly with updated history to maintain conversation context.
+   */
+  async runChatTurn(
+    message: string,
+    history: AgentMessage[],
+    hooks: Hooks
+  ): Promise<{ response: string; updatedHistory: AgentMessage[] }> {
+    if (!this.initialized) await this.initialize()
+
+    const { onProgress } = hooks
+
+    const result = await this.runner.run({
+      agentName: 'quorum-chat',
+      userMessage: message,
+      conversationHistory: history,
+      projectDir: this.projectDir,
+      agentsDir: this.agentsDir,
+      routingTable: this.routingTable,
+      onProgress
+    })
+
+    // If the response contains code blocks, write them to disk
+    const written = await this.extractAndWriteCodeBlocks(result.content)
+
+    const updatedHistory: AgentMessage[] = [
+      ...history,
+      { role: 'user', content: message },
+      { role: 'assistant', content: result.content }
+    ]
+
+    return {
+      response: result.content,
+      updatedHistory
+    }
+  }
+
+
 
   private async runNew(description: string, hooks: Hooks): Promise<void> {
     const { onProgress } = hooks
 
-    // Foundation mode for new projects
+    // Classify first — MICRO tasks skip everything including Foundation Mode
+    onProgress?.('\nClassifying project...')
+    const classification = await this.classify(description, hooks)
+    onProgress?.(`→ ${classification.classification}: ${classification.reasoning}`)
+
+    // For MICRO: suppress verbose classifier panel, just one line above
+    // For SIMPLE/COMPLEX: show full classifier details
+    if (classification.classification !== 'MICRO') {
+      hooks.onAgentOutput?.('quorum-classifier', `CLASSIFICATION: ${classification.classification}\nREASONING: ${classification.reasoning}`)
+    }
+
+    // MICRO path: single script/snippet — skip all phases, write code directly
+    if (classification.classification === 'MICRO') {
+      onProgress?.('Micro task — writing code directly.')
+      const coderResponse = await this.runner.run({
+        agentName: 'quorum-coder',
+        userMessage: description,
+        projectDir: this.projectDir,
+        agentsDir: this.agentsDir,
+        routingTable: this.routingTable,
+        onProgress
+      })
+
+      // Extract code blocks from the AI response and write them to disk
+      const written = await this.extractAndWriteCodeBlocks(coderResponse.content)
+      
+      hooks.onAgentOutput?.('quorum-coder', coderResponse.content)
+      if (written.length > 0) {
+        onProgress?.(`\n✓ Written to ${this.projectDir}:`)
+        for (const f of written) {
+          onProgress?.(`  → ${f}`)
+        }
+      } else {
+        // No parseable code blocks — show the raw response
+        onProgress?.(coderResponse.content)
+      }
+      return
+    }
+
+    // Foundation mode for new non-micro projects
     const isNew = !(await this.ns.exists())
     if (isNew) {
       onProgress?.('New project — running Foundation Mode...')
       await this.ns.initialize()
       await this.runFoundationMode(description, hooks)
     }
-
-    // Classify complexity
-    onProgress?.('\nClassifying project...')
-    const classification = await this.classify(description, hooks)
-    onProgress?.(`→ ${classification.classification}: ${classification.reasoning}`)
 
     if (classification.classification === 'SIMPLE' &&
         this.config.checkpoints.auto_proceed_simple_projects) {
@@ -246,7 +320,7 @@ export class ATLASEngine {
         question: 'Run scaling & cost analysis? (shows bottlenecks at 100/1K/10K/100K users)',
         options: [
           { label: 'YES', tradeoff: '~2 min, recommended before launch' },
-          { label: 'SKIP', tradeoff: 'Run atlas sync --scaling later' }
+          { label: 'SKIP', tradeoff: 'Run quorum sync --scaling later' }
         ]
       }
       const response = await hooks.onCheckpoint(checkpoint)
@@ -259,13 +333,13 @@ export class ATLASEngine {
     onProgress?.('\nATLAS complete.')
   }
 
-  // ── atlas enhance ───────────────────────────────────────────────────────────
+  // ── quorum enhance ───────────────────────────────────────────────────────────
 
   private async runEnhance(description: string, hooks: Hooks): Promise<void> {
     const { onProgress } = hooks
 
     if (!(await this.ns.exists())) {
-      onProgress?.('No .atlas/ found. Run: atlas init')
+      onProgress?.('No .quorum/ found. Run: atlas init')
       return
     }
 
@@ -296,18 +370,18 @@ export class ATLASEngine {
     await this.saveSession(hooks)
   }
 
-  // ── atlas status ────────────────────────────────────────────────────────────
+  // ── quorum status ────────────────────────────────────────────────────────────
 
   private async runStatus(hooks: Hooks & { extra?: Record<string, string> }): Promise<void> {
     const { onProgress } = hooks
-    const extra = (hooks as ATLASRunOptions).extra ?? {}
+    const extra = (hooks as QUORUMRunOptions).extra ?? {}
 
     onProgress?.('\nATLAS STATUS')
     onProgress?.('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
     // Active providers
     const active = this.routingTable.providers_active
-    onProgress?.(`Providers: ${active.length > 0 ? active.join(', ') : 'none — run: atlas key add PROVIDER_KEY=your-key'}`)
+    onProgress?.(`Providers: ${active.length > 0 ? active.join(', ') : 'none — run: quorum key add PROVIDER_KEY=your-key'}`)
 
     // Optional: full routing table
     if (extra['routing'] === 'true') {
@@ -317,10 +391,10 @@ export class ATLASEngine {
       }
     }
 
-    const atlasDir = path.join(this.projectDir, '.atlas')
+    const quorumDir = path.join(this.projectDir, '.quorum')
     if (await this.ns.exists()) {
-      const taskIndexPath = path.join(atlasDir, 'task-index.json')
-      const planIndexPath = path.join(atlasDir, 'plan-index.json')
+      const taskIndexPath = path.join(quorumDir, 'task-index.json')
+      const planIndexPath = path.join(quorumDir, 'plan-index.json')
 
       if (existsSync(taskIndexPath)) {
         const ti = JSON.parse(await readFile(taskIndexPath, 'utf-8')) as {
@@ -356,13 +430,13 @@ export class ATLASEngine {
       }
 
     } else {
-      onProgress?.('\nNo .atlas/ found → run: atlas init')
+      onProgress?.('\nNo .quorum/ found → run: atlas init')
     }
 
     onProgress?.('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   }
 
-  // ── atlas sync ──────────────────────────────────────────────────────────────
+  // ── quorum sync ──────────────────────────────────────────────────────────────
 
   private async runSync(hooks: Hooks): Promise<void> {
     const { onProgress } = hooks
@@ -391,7 +465,7 @@ export class ATLASEngine {
     if (result.recommendation === 'BLOCK') {
       onProgress?.(`SCOPE GUARD: ${result.reasoning}`)
       onProgress?.('This is explicitly out of scope per goal.md.')
-      onProgress?.('To proceed: update .atlas/goal.md and re-run.')
+      onProgress?.('To proceed: update .quorum/goal.md and re-run.')
       return false
     }
 
@@ -404,7 +478,7 @@ export class ATLASEngine {
 
   private async ensurePlanExists(
     description: string,
-    options: ATLASRunOptions
+    options: QUORUMRunOptions
   ): Promise<boolean> {
     const { onProgress, onCheckpoint, onAgentOutput } = options
 
@@ -413,14 +487,14 @@ export class ATLASEngine {
     onProgress?.('\nNo implementation plan — creating one before building...')
 
     const planResponse = await this.runner.run({
-      agentName: 'atlas-planner',
+      agentName: 'quorum-planner',
       userMessage: `Create implementation plan for: ${description}`,
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
       routingTable: this.routingTable,
       onProgress
     })
-    onAgentOutput?.('atlas-planner', planResponse.content)
+    onAgentOutput?.('quorum-planner', planResponse.content)
 
     if (!options.auto && onCheckpoint) {
       const response = await onCheckpoint({
@@ -432,28 +506,77 @@ export class ATLASEngine {
           { label: 'APPROVE', tradeoff: 'Build starts' },
           { label: 'REQUEST CHANGES', tradeoff: 'Plan revised first' }
         ],
-        supportingDoc: '.atlas/implementation-plan.md'
+        supportingDoc: '.quorum/implementation-plan.md'
       })
 
       if (!response.toUpperCase().includes('APPROVE') && response !== 'A') {
         const revised = await this.runner.run({
-          agentName: 'atlas-planner',
+          agentName: 'quorum-planner',
           userMessage: `Revise plan: ${response}\nOriginal:\n${planResponse.content}`,
           projectDir: this.projectDir,
           agentsDir: this.agentsDir,
           routingTable: this.routingTable,
           onProgress
         })
-        onAgentOutput?.('atlas-planner (revision)', revised.content)
+        onAgentOutput?.('quorum-planner (revision)', revised.content)
       }
     }
 
     return true
   }
 
+  /** Parse fenced code blocks from agent output and write each to disk.
+   *  Recognises: ```python:filename.py or ```python (derives filename automatically)
+   *  Returns a list of files that were written. */
+  private async extractAndWriteCodeBlocks(content: string): Promise<string[]> {
+    const { writeFile: wf, mkdir: mkd } = await import('fs/promises')
+    const written: string[] = []
+
+    // Match ``` blocks — optional language and optional :filename hint
+    const blockRe = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g
+    const langToExt: Record<string, string> = {
+      python: 'py', py: 'py',
+      javascript: 'js', js: 'js', typescript: 'ts', ts: 'ts',
+      bash: 'sh', sh: 'sh', shell: 'sh',
+      go: 'go', rust: 'rs', ruby: 'rb', java: 'java', c: 'c', cpp: 'cpp',
+      html: 'html', css: 'css', json: 'json', yaml: 'yml', toml: 'toml',
+    }
+    let fileIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = blockRe.exec(content)) !== null) {
+      const lang = (match[1] ?? '').toLowerCase()
+      const hintFile = match[2]?.trim()
+      const code = match[3] ?? ''
+      if (!code.trim()) continue
+
+      // Determine filename
+      let filename: string
+      if (hintFile) {
+        filename = hintFile
+      } else {
+        const ext = langToExt[lang] ?? (lang || 'txt')
+        // Try to extract filename from inside the code (e.g. # hello_world.py)
+        const commentMatch = code.match(/^#\s*([^\n]+\.\w+)/m)
+        if (commentMatch?.[1]) {
+          filename = commentMatch[1].trim()
+        } else {
+          filename = fileIndex === 0 ? `output.${ext}` : `output_${fileIndex}.${ext}`
+        }
+      }
+      fileIndex++
+
+      const fullPath = path.join(this.projectDir, filename)
+      await mkd(path.dirname(fullPath), { recursive: true })
+      await wf(fullPath, code, 'utf-8')
+      written.push(filename)
+    }
+
+    return written
+  }
+
   private async createRollbackPoint(name: string): Promise<void> {
     const { mkdir: mkdirAsync, writeFile: writeFileAsync } = await import('fs/promises')
-    const rollbackDir = path.join(this.projectDir, '.atlas', 'rollback_points', name)
+    const rollbackDir = path.join(this.projectDir, '.quorum', 'rollback_points', name)
     await mkdirAsync(rollbackDir, { recursive: true })
 
     const snapshot = {
@@ -496,21 +619,25 @@ export class ATLASEngine {
   private async classify(description: string, hooks: Hooks): Promise<ClassificationResult> {
     const stack = await this.ns.readStack()
     const response = await this.runner.run({
-      agentName: 'atlas-classifier',
+      agentName: 'quorum-classifier',
       userMessage: `Project description: ${description}\n\nExisting stack context: ${JSON.stringify(stack)}`,
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
       routingTable: this.routingTable,
       onProgress: hooks.onProgress
     })
-    hooks.onAgentOutput?.('atlas-classifier', response.content)
+    // NOTE: onAgentOutput is intentionally NOT called here.
+    // The caller (runNew) decides whether to surface classifier details to the UI.
 
     const lines = response.content.split('\n')
     const classLine = lines.find(l => /^CLASSIFICATION:/i.test(l))
     const reasonLine = lines.find(l => /^REASONING:/i.test(l))
 
+    const rawClass = classLine?.split(':')[1]?.trim().toUpperCase() ?? 'COMPLEX'
+    const validClasses = ['MICRO', 'SIMPLE', 'COMPLEX']
+    const safeClass = validClasses.includes(rawClass) ? rawClass : 'COMPLEX'
     return {
-      classification: (classLine?.split(':')[1]?.trim() ?? 'COMPLEX') as 'SIMPLE' | 'COMPLEX',
+      classification: safeClass as 'MICRO' | 'SIMPLE' | 'COMPLEX',
       reasoning: reasonLine?.split(':').slice(1).join(':').trim() ?? response.content.slice(0, 200),
       inferred_stack: {},
       unknown_critical: [],
@@ -520,15 +647,15 @@ export class ATLASEngine {
 
   private async runFoundationMode(description: string, hooks: Hooks): Promise<void> {
     const response = await this.runner.run({
-      agentName: 'atlas-nervous-system',
-      userMessage: `FOUNDATION MODE — New project.\nDescription: ${description}\nSeed the .atlas/ folder with initial stack detection and decisions.`,
+      agentName: 'quorum-nervous-system',
+      userMessage: `FOUNDATION MODE — New project.\nDescription: ${description}\nSeed the .quorum/ folder with initial stack detection and decisions.`,
       context: { PROJECT_DESCRIPTION: description },
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
       routingTable: this.routingTable,
       onProgress: hooks.onProgress
     })
-    hooks.onAgentOutput?.('atlas-nervous-system', response.content)
+    hooks.onAgentOutput?.('quorum-nervous-system', response.content)
 
     // Try to extract stack JSON and save it
     const stackMatch = response.content.match(/```json\n([\s\S]*?)\n```/)
@@ -547,26 +674,26 @@ export class ATLASEngine {
 
     // Architect proposes
     const archResponse = await this.runner.run({
-      agentName: 'atlas-backend-architect',
+      agentName: 'quorum-backend-architect',
       userMessage: `Project: ${description}`,
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
       routingTable: this.routingTable,
       onProgress
     })
-    hooks.onAgentOutput?.('atlas-backend-architect', archResponse.content)
+    hooks.onAgentOutput?.('quorum-backend-architect', archResponse.content)
     messages.push({ role: 'assistant', content: archResponse.content })
 
     // Critic reviews
     const criticResponse = await this.runner.run({
-      agentName: 'atlas-critic',
+      agentName: 'quorum-critic',
       userMessage: `Review this architecture:\n\n${archResponse.content}`,
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
       routingTable: this.routingTable,
       onProgress
     })
-    hooks.onAgentOutput?.('atlas-critic', criticResponse.content)
+    hooks.onAgentOutput?.('quorum-critic', criticResponse.content)
 
     // Architect-Validator loop
     let architectureDoc = archResponse.content
@@ -574,14 +701,14 @@ export class ATLASEngine {
 
     for (let round = 0; round < maxRounds; round++) {
       const valResponse = await this.runner.run({
-        agentName: 'atlas-backend-validator',
+        agentName: 'quorum-backend-validator',
         userMessage: `Validate:\n\n${architectureDoc}\n\nCritic notes:\n${criticResponse.content}`,
         projectDir: this.projectDir,
         agentsDir: this.agentsDir,
         routingTable: this.routingTable,
         onProgress
       })
-      hooks.onAgentOutput?.('atlas-backend-validator', valResponse.content)
+      hooks.onAgentOutput?.('quorum-backend-validator', valResponse.content)
 
       const approved =
         /CONFIDENCE:\s*100%/i.test(valResponse.content) ||
@@ -594,7 +721,7 @@ export class ATLASEngine {
 
       // Architect revises
       const revResponse = await this.runner.run({
-        agentName: 'atlas-backend-architect',
+        agentName: 'quorum-backend-architect',
         userMessage: `Revise based on validator:\n\n${valResponse.content}\n\nOriginal:\n\n${architectureDoc}`,
         projectDir: this.projectDir,
         agentsDir: this.agentsDir,
@@ -602,13 +729,13 @@ export class ATLASEngine {
         onProgress
       })
       architectureDoc = revResponse.content
-      hooks.onAgentOutput?.('atlas-backend-architect', revResponse.content)
+      hooks.onAgentOutput?.('quorum-backend-architect', revResponse.content)
     }
 
     // Save architecture proposal
     await this.tools.execute({
       tool: 'file_write',
-      path: '.atlas/context/architecture-proposal.md',
+      path: '.quorum/context/architecture-proposal.md',
       content: architectureDoc,
       mode: 'create'
     })
@@ -624,14 +751,14 @@ export class ATLASEngine {
           { label: 'APPROVE', tradeoff: 'Proceed to frontend design' },
           { label: 'REQUEST CHANGES', tradeoff: 'One revision round, then proceed' }
         ],
-        supportingDoc: '.atlas/context/architecture-proposal.md'
+        supportingDoc: '.quorum/context/architecture-proposal.md'
       }
       const response = await hooks.onCheckpoint(checkpoint)
 
       if (!/^(approve|a)$/i.test(response.trim())) {
         // Human wants changes — one more revision
         const finalRev = await this.runner.run({
-          agentName: 'atlas-backend-architect',
+          agentName: 'quorum-backend-architect',
           userMessage: `Human feedback: ${response}\n\nRevise:\n\n${architectureDoc}`,
           projectDir: this.projectDir,
           agentsDir: this.agentsDir,
@@ -641,11 +768,11 @@ export class ATLASEngine {
         architectureDoc = finalRev.content
         await this.tools.execute({
           tool: 'file_write',
-          path: '.atlas/context/architecture-proposal.md',
+          path: '.quorum/context/architecture-proposal.md',
           content: architectureDoc,
           mode: 'create'
         })
-        hooks.onAgentOutput?.('atlas-backend-architect', finalRev.content)
+        hooks.onAgentOutput?.('quorum-backend-architect', finalRev.content)
       }
     }
 
@@ -657,32 +784,32 @@ export class ATLASEngine {
     const { onProgress } = hooks
     onProgress?.('\n── Phase 2: Frontend Design ───────────────────────')
 
-    const archDoc = existsSync(path.join(this.projectDir, '.atlas/context/architecture-proposal.md'))
-      ? await readFile(path.join(this.projectDir, '.atlas/context/architecture-proposal.md'), 'utf-8')
+    const archDoc = existsSync(path.join(this.projectDir, '.quorum/context/architecture-proposal.md'))
+      ? await readFile(path.join(this.projectDir, '.quorum/context/architecture-proposal.md'), 'utf-8')
       : 'No architecture doc available.'
 
     const designResponse = await this.runner.run({
-      agentName: 'atlas-design-architect',
+      agentName: 'quorum-design-architect',
       userMessage: `Project: ${description}\n\nApproved architecture:\n${archDoc}`,
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
       routingTable: this.routingTable,
       onProgress
     })
-    hooks.onAgentOutput?.('atlas-design-architect', designResponse.content)
+    hooks.onAgentOutput?.('quorum-design-architect', designResponse.content)
 
     // Design validator loop
     let designDoc = designResponse.content
     for (let round = 0; round < this.config.loop_limits.design_loop_max_rounds; round++) {
       const valResponse = await this.runner.run({
-        agentName: 'atlas-design-validator',
+        agentName: 'quorum-design-validator',
         userMessage: `Validate design:\n\n${designDoc}`,
         projectDir: this.projectDir,
         agentsDir: this.agentsDir,
         routingTable: this.routingTable,
         onProgress
       })
-      hooks.onAgentOutput?.('atlas-design-validator', valResponse.content)
+      hooks.onAgentOutput?.('quorum-design-validator', valResponse.content)
       if (/Confidence:\s*100%/i.test(valResponse.content) ||
           /DESIGN VALIDATOR SIGN-OFF/i.test(valResponse.content)) {
         break
@@ -691,7 +818,7 @@ export class ATLASEngine {
 
     await this.tools.execute({
       tool: 'file_write',
-      path: '.atlas/context/design-proposal.md',
+      path: '.quorum/context/design-proposal.md',
       content: designDoc,
       mode: 'create'
     })
@@ -709,7 +836,7 @@ export class ATLASEngine {
           { label: 'SELECT 3', tradeoff: '' },
           { label: 'SELECT 4', tradeoff: '' }
         ],
-        supportingDoc: '.atlas/context/design-proposal.md'
+        supportingDoc: '.quorum/context/design-proposal.md'
       }
       await hooks.onCheckpoint(checkpoint)
     }
@@ -731,7 +858,7 @@ export class ATLASEngine {
     // Backend and frontend run in parallel
     const [backendResponse, frontendResponse] = await Promise.all([
       this.runner.run({
-        agentName: 'atlas-backend-architect',
+        agentName: 'quorum-backend-builder',
         userMessage: `Build the backend for: ${description}${context}`,
         projectDir: this.projectDir,
         agentsDir: this.agentsDir,
@@ -739,7 +866,7 @@ export class ATLASEngine {
         onProgress
       }),
       this.runner.run({
-        agentName: 'atlas-frontend-builder',
+        agentName: 'quorum-frontend-builder',
         userMessage: `Build the frontend for: ${description}${context}`,
         projectDir: this.projectDir,
         agentsDir: this.agentsDir,
@@ -748,12 +875,16 @@ export class ATLASEngine {
       })
     ])
 
-    hooks.onAgentOutput?.('atlas-backend-architect', backendResponse.content)
-    hooks.onAgentOutput?.('atlas-frontend-builder', frontendResponse.content)
+    hooks.onAgentOutput?.('quorum-backend-builder', backendResponse.content)
+    hooks.onAgentOutput?.('quorum-frontend-builder', frontendResponse.content)
+
+    // Extract and persist agent output documents for Phase 4 to consume
+    await this.extractAndSaveDoc(backendResponse.content, 'api-contract.md', '.quorum/context/api-contract.md')
+    await this.extractAndSaveDoc(frontendResponse.content, 'frontend-api-calls.md', '.quorum/context/frontend-api-calls.md')
 
     // Critic monitors
     await this.runner.run({
-      agentName: 'atlas-critic',
+      agentName: 'quorum-critic',
       userMessage: `Review build output.\nBackend:\n${backendResponse.content.slice(0, 3000)}\n\nFrontend:\n${frontendResponse.content.slice(0, 3000)}`,
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
@@ -761,52 +892,144 @@ export class ATLASEngine {
       onProgress
     })
 
+    await this.createRollbackPoint('rp_003_build_complete')
     onProgress?.('  Phase 3 complete.')
   }
 
   private async runIntegrationPhase(hooks: Hooks): Promise<void> {
-    hooks.onProgress?.('\n── Phase 4: Integration ───────────────────────────')
-    const response = await this.runner.run({
-      agentName: 'atlas-integration',
-      userMessage: 'Verify frontend-backend API connections and run integration checks.',
-      projectDir: this.projectDir,
-      agentsDir: this.agentsDir,
-      routingTable: this.routingTable,
-      onProgress: hooks.onProgress
+    const { onProgress } = hooks
+    onProgress?.('\n── Phase 4: Integration ───────────────────────────')
+
+    const archPath = path.join(this.projectDir, '.quorum/context/architecture-proposal.md')
+    const frontendCallsPath = path.join(this.projectDir, '.quorum/context/frontend-api-calls.md')
+    const archDoc = existsSync(archPath) ? await readFile(archPath, 'utf-8') : 'No architecture doc available.'
+    const frontendCalls = existsSync(frontendCallsPath) ? await readFile(frontendCallsPath, 'utf-8') : 'No frontend-api-calls.md found.'
+
+    const maxRounds = this.config.loop_limits.integration_max_rounds ?? 2
+    let integrationDoc = ''
+    let readyForTesting = false
+
+    for (let round = 0; round < maxRounds; round++) {
+      const roundPrefix = round > 0 ? `Round ${round + 1} — previous output had unresolved issues.\n\n` : ''
+      const response = await this.runner.run({
+        agentName: 'quorum-integration',
+        userMessage: `${roundPrefix}Verify frontend-backend API connections and fix all mismatches.\n\narchitecture-proposal.md:\n${archDoc.slice(0, 4000)}\n\nfrontend-api-calls.md:\n${frontendCalls.slice(0, 4000)}`,
+        projectDir: this.projectDir,
+        agentsDir: this.agentsDir,
+        routingTable: this.routingTable,
+        onProgress
+      })
+      hooks.onAgentOutput?.('quorum-integration', response.content)
+      integrationDoc = response.content
+      readyForTesting = /Status:\s*READY FOR TESTING/i.test(response.content)
+
+      // Surface architecture gaps to human for a go/defer decision
+      if (/ARCHITECTURE GAP FOUND/i.test(response.content) && hooks.onCheckpoint) {
+        const gapSection = response.content.match(/ARCHITECTURE GAP FOUND[\s\S]*?(?=\n##|\n---|$)/)?.[0] ?? ''
+        const checkpoint: Checkpoint = {
+          type: 'BLOCKER',
+          title: 'Architecture Gap — Human Decision Required',
+          completed: ['Contract comparison', 'Mismatch classification'],
+          question: `${gapSection}\n\nChoose: A) Implement simple version now  B) Defer to next session`,
+          options: [
+            { label: 'A — IMPLEMENT NOW', tradeoff: 'Agent implements minimal version' },
+            { label: 'B — DEFER', tradeoff: 'Gap logged, continue with existing code' }
+          ]
+        }
+        const gapResponse = await hooks.onCheckpoint(checkpoint)
+        if (/^b|defer/i.test(gapResponse.trim())) {
+          onProgress?.('  Architecture gap deferred — continuing.')
+          readyForTesting = true
+          break
+        }
+        continue
+      }
+
+      if (readyForTesting) break
+    }
+
+    await this.tools.execute({
+      tool: 'file_write',
+      path: '.quorum/context/integration-fixes.md',
+      content: integrationDoc,
+      mode: 'create'
     })
-    hooks.onAgentOutput?.('atlas-integration', response.content)
-    hooks.onProgress?.('  Phase 4 complete.')
+
+    if (!readyForTesting) {
+      onProgress?.('  ⚠ Integration sign-off not confirmed — proceeding with caution.')
+    }
+    onProgress?.('  Phase 4 complete.')
   }
 
   private async runTestingPhase(hooks: Hooks): Promise<boolean> {
     const { onProgress } = hooks
     onProgress?.('\n── Phase 5: Testing ───────────────────────────────')
 
-    const response = await this.runner.run({
-      agentName: 'atlas-testing',
-      userMessage: 'Run end-to-end tests on the application.',
-      projectDir: this.projectDir,
-      agentsDir: this.agentsDir,
-      routingTable: this.routingTable,
-      onProgress
-    })
-    hooks.onAgentOutput?.('atlas-testing', response.content)
+    const integrationFixesPath = path.join(this.projectDir, '.quorum/context/integration-fixes.md')
+    const bugRegistryPath = path.join(this.projectDir, '.quorum/nervous-system/bug-registry.json')
+    const stackPath = path.join(this.projectDir, '.quorum/nervous-system/stack.json')
+    const bugsPath = path.join(this.projectDir, '.quorum/BUGS.md')
+
+    const integrationFixes = existsSync(integrationFixesPath) ? await readFile(integrationFixesPath, 'utf-8') : 'No integration-fixes.md found.'
+    const bugRegistry = existsSync(bugRegistryPath) ? await readFile(bugRegistryPath, 'utf-8') : '[]'
+    const stack = existsSync(stackPath) ? await readFile(stackPath, 'utf-8') : '{}'
+
+    const maxAttempts = this.config.loop_limits.bug_fix_max_attempts ?? 2
+    let testingResponse = ''
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const attemptPrefix = attempt > 0 ? `Fix attempt ${attempt + 1}. Address remaining critical bugs.\n\n` : ''
+      const response = await this.runner.run({
+        agentName: 'quorum-testing',
+        userMessage: `${attemptPrefix}Run end-to-end tests on the application.\n\nintegration-fixes.md:\n${integrationFixes.slice(0, 3000)}\n\nbug-registry.json:\n${bugRegistry.slice(0, 2000)}\n\nstack.json:\n${stack}`,
+        projectDir: this.projectDir,
+        agentsDir: this.agentsDir,
+        routingTable: this.routingTable,
+        onProgress
+      })
+      hooks.onAgentOutput?.('quorum-testing', response.content)
+      testingResponse = response.content
+
+      await this.appendBugsToRegistry(testingResponse, bugsPath)
+      await this.persistTestCoverage(testingResponse)
+
+      // Stop retrying once no unresolved critical bugs remain
+      const hasUnresolvedCritical = /Severity:\s*critical/i.test(testingResponse)
+        && !/Fix applied:/i.test(testingResponse)
+      if (!hasUnresolvedCritical) break
+      onProgress?.(`  Critical bugs remain — fix attempt ${attempt + 2}...`)
+    }
 
     // Checkpoint C
     if (this.config.checkpoints.require_human_phase_5 && hooks.onCheckpoint) {
       const checkpoint: Checkpoint = {
         type: 'C',
         title: 'Testing Complete',
-        completed: ['End-to-end tests run', 'Bugs documented'],
-        question: 'Review results and approve to finalize.',
+        completed: ['End-to-end tests run', 'Bugs documented', 'Coverage recorded'],
+        question: 'Review results and APPROVE to finalize, or type REVIEW <BUG-ID> to investigate a deferred bug.',
         options: [
           { label: 'APPROVE', tradeoff: 'Proceed to completion' },
           { label: 'REQUEST FIXES', tradeoff: 'Agents will address specific issues' }
         ],
-        supportingDoc: '.atlas/BUGS.md'
+        supportingDoc: '.quorum/BUGS.md'
       }
       const humanResponse = await hooks.onCheckpoint(checkpoint)
-      if (!/^(approve|a)$/i.test(humanResponse.trim())) return false
+
+      if (/^review\s+/i.test(humanResponse.trim())) {
+        const bugId = humanResponse.replace(/^review\s+/i, '').trim()
+        onProgress?.(`  Reviewing ${bugId}...`)
+        const reviewResponse = await this.runner.run({
+          agentName: 'quorum-testing',
+          userMessage: `Review and fix ${bugId}. Read .quorum/BUGS.md for full details.`,
+          projectDir: this.projectDir,
+          agentsDir: this.agentsDir,
+          routingTable: this.routingTable,
+          onProgress
+        })
+        hooks.onAgentOutput?.('quorum-testing', reviewResponse.content)
+      } else if (!/^(approve|a)$/i.test(humanResponse.trim())) {
+        return false
+      }
     }
 
     onProgress?.('  Phase 5 complete.')
@@ -815,27 +1038,65 @@ export class ATLASEngine {
 
   private async runScalingPhase(hooks: Hooks): Promise<void> {
     hooks.onProgress?.('\n── Phase 6: Scaling Analysis ──────────────────────')
+
+    const archPath = path.join(this.projectDir, '.quorum/context/architecture-proposal.md')
+    const registryPath = path.join(this.projectDir, '.quorum/function-registry.json')
+    const archDoc = existsSync(archPath) ? await readFile(archPath, 'utf-8') : ''
+    const registry = existsSync(registryPath) ? await readFile(registryPath, 'utf-8') : '{}'
+
     const response = await this.runner.run({
-      agentName: 'atlas-scaling',
-      userMessage: 'Analyze scaling and cost for this application at 100/1K/10K/100K users.',
+      agentName: 'quorum-scaling',
+      userMessage: `Analyze scaling and cost for this application at 100/1K/10K/100K users.\n\narchitecture-proposal.md:\n${archDoc.slice(0, 5000)}\n\nfunction-registry.json:\n${registry.slice(0, 3000)}`,
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
       routingTable: this.routingTable,
       onProgress: hooks.onProgress
     })
-    hooks.onAgentOutput?.('atlas-scaling', response.content)
+    hooks.onAgentOutput?.('quorum-scaling', response.content)
     await this.tools.execute({
       tool: 'file_write',
-      path: '.atlas/context/scaling-report.md',
+      path: '.quorum/context/scaling-report.md',
       content: response.content,
       mode: 'create'
     })
     hooks.onProgress?.('  Phase 6 complete.')
   }
 
+  /** Extract a named document section from agent output and write it to .quorum/. */
+  private async extractAndSaveDoc(content: string, docName: string, savePath: string): Promise<void> {
+    const escaped = docName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = new RegExp(`# ${escaped}[\\s\\S]*?(?=\\n# |$)`, 'i')
+    const match = content.match(pattern)
+    if (match) {
+      await this.tools.execute({ tool: 'file_write', path: savePath, content: match[0], mode: 'create' })
+    }
+  }
+
+  /** Parse BUG-* blocks from testing output and append them to .quorum/BUGS.md. */
+  private async appendBugsToRegistry(content: string, bugsPath: string): Promise<void> {
+    const { appendFile, mkdir } = await import('fs/promises')
+    const bugBlocks = content.match(/---\n## BUG-[\s\S]*?---/g) ?? []
+    if (bugBlocks.length === 0) return
+    await mkdir(path.dirname(bugsPath), { recursive: true })
+    await appendFile(bugsPath, '\n' + bugBlocks.join('\n'), 'utf-8')
+  }
+
+  /** Parse test-coverage.json block from testing output and write it to .quorum/nervous-system/. */
+  private async persistTestCoverage(content: string): Promise<void> {
+    const { writeFile, mkdir } = await import('fs/promises')
+    const jsonMatch = content.match(/```json\n(\{[\s\S]*?"last_run"[\s\S]*?\})\n```/)
+    if (!jsonMatch?.[1]) return
+    try {
+      JSON.parse(jsonMatch[1])
+      const coveragePath = path.join(this.projectDir, '.quorum/nervous-system/test-coverage.json')
+      await mkdir(path.dirname(coveragePath), { recursive: true })
+      await writeFile(coveragePath, jsonMatch[1], 'utf-8')
+    } catch { /* not valid JSON — skip */ }
+  }
+
   private async saveSession(hooks: Hooks): Promise<void> {
     await this.runner.run({
-      agentName: 'atlas-nervous-system',
+      agentName: 'quorum-nervous-system',
       userMessage: `End of session ${this.sessionId}. Extract and save all decisions, actions, and reasoning from this session.`,
       projectDir: this.projectDir,
       agentsDir: this.agentsDir,
@@ -852,41 +1113,28 @@ export class ATLASEngine {
 
   // ── Config loading ──────────────────────────────────────────────────────────
 
-  private async loadConfig(): Promise<ATLASConfig> {
+  private async loadConfig(): Promise<QUORUMConfig> {
     // Try user-provided path first
     if (this.options.configPath && existsSync(this.options.configPath)) {
-      return JSON.parse(await readFile(this.options.configPath, 'utf-8')) as ATLASConfig
+      return JSON.parse(await readFile(this.options.configPath, 'utf-8')) as QUORUMConfig
     }
     // Try standard locations in project dir
     for (const rel of CONFIG_PATHS) {
       const fullPath = path.join(this.projectDir, rel)
       if (existsSync(fullPath)) {
-        return JSON.parse(await readFile(fullPath, 'utf-8')) as ATLASConfig
+        return JSON.parse(await readFile(fullPath, 'utf-8')) as QUORUMConfig
       }
     }
     // Default config — works with just ANTHROPIC_API_KEY
     return this.defaultConfig()
   }
 
-  private defaultConfig(): ATLASConfig {
+  private defaultConfig(): QUORUMConfig {
     return {
       version: '2.0',
       simplicity_mode: true,
       api_keys: {},
-      auto_provider_selection: {
-        'atlas-orchestrator':        { priority: ['anthropic/claude-opus-4-6', 'openai/gpt-4o'] },
-        'atlas-classifier':          { priority: ['groq/llama-3.3-70b-versatile', 'anthropic/claude-haiku-4-5-20251001'] },
-        'atlas-critic':              { priority: ['openai/gpt-4o-mini', 'anthropic/claude-haiku-4-5-20251001'] },
-        'atlas-backend-architect':   { priority: ['anthropic/claude-sonnet-4-6', 'openai/gpt-4o'] },
-        'atlas-backend-validator':   { priority: ['openai/gpt-4o', 'anthropic/claude-sonnet-4-6'] },
-        'atlas-design-architect':    { priority: ['v0/v0-latest', 'anthropic/claude-sonnet-4-6'] },
-        'atlas-design-validator':    { priority: ['anthropic/claude-haiku-4-5-20251001'] },
-        'atlas-frontend-builder':    { priority: ['v0/v0-latest', 'anthropic/claude-sonnet-4-6'] },
-        'atlas-integration':         { priority: ['anthropic/claude-sonnet-4-6'] },
-        'atlas-testing':             { priority: ['anthropic/claude-sonnet-4-6'] },
-        'atlas-scaling':             { priority: ['groq/llama-3.3-70b-versatile', 'anthropic/claude-haiku-4-5-20251001'] },
-        'atlas-nervous-system':      { priority: ['anthropic/claude-haiku-4-5-20251001'] }
-      },
+      auto_provider_selection: {},
       fallback_strategy: {
         on_provider_unavailable: 'try_next_in_priority_list',
         final_fallback: 'anthropic/claude-sonnet-4-6',

@@ -1,10 +1,10 @@
 {
-  "name": "@atlas/mcp",
-  "version": "1.0.0",
-  "description": "ATLAS MCP server — exposes 14 ATLAS tools to Claude Desktop, Cursor, Windsurf, and any MCP-compatible client",
+  "name": "@quorum/mcp",
+  "version": "1.1.0",
+  "description": "QUORUM MCP server — exposes 14 QUORUM tools to Claude Desktop, Cursor, Windsurf, and any MCP-compatible client",
   "type": "module",
   "bin": {
-    "atlas-mcp": "./dist/server.js"
+    "quorum-mcp": "./dist/server.js"
   },
   "main": "./dist/server.js",
   "scripts": {
@@ -13,7 +13,7 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@atlas/core": "*",
+    "@quorum/core": "*",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {

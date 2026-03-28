@@ -1,6 +1,6 @@
-// All shared TypeScript types for ATLAS core engine
+// All shared TypeScript types for QUORUM core engine
 
-export interface ATLASConfig {
+export interface QUORUMConfig {
   version: string
   simplicity_mode: boolean
   api_keys: {
@@ -15,7 +15,7 @@ export interface ATLASConfig {
     LOCAL_OLLAMA_ENDPOINT?: string
   }
   // Which model to use per provider per quality tier.
-  // ATLAS auto-detects your keys and builds routing from this.
+  // QUORUM auto-detects your keys and builds routing from this.
   // No need to touch auto_provider_selection — just set your keys.
   model_preferences?: {
     // Google Gemini — put your GOOGLE_AI_API_KEY in api_keys above
@@ -147,7 +147,7 @@ export interface ToolResult {
   error?: string
 }
 
-export interface ATLASRunOptions {
+export interface QUORUMRunOptions {
   command: 'new' | 'enhance' | 'status' | 'sync' | 'rollback' |
            'init' | 'fast' | 'next' | 'pause' | 'resume' |
            'doctor' | 'discuss' | 'verify' | 'ship' | 'review' |
@@ -393,7 +393,7 @@ export interface FunctionEntry {
   design_note?: string
 }
 
-export type ProjectComplexity = 'SIMPLE' | 'COMPLEX'
+export type ProjectComplexity = 'MICRO' | 'SIMPLE' | 'COMPLEX'
 
 export interface ClassificationResult {
   classification: ProjectComplexity

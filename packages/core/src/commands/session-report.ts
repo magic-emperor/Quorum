@@ -1,6 +1,6 @@
 import { writeFile } from 'fs/promises'
 import path from 'path'
-import type { ATLASRunOptions, SessionReport } from '../types.js'
+import type { QUORUMRunOptions, SessionReport } from '../types.js'
 import { NervousSystem } from '../memory/nervous-system.js'
 import { TaskManager } from '../memory/task-manager.js'
 import { PlanManager } from '../memory/plan-manager.js'
@@ -8,7 +8,7 @@ import { runNext } from './next.js'
 
 export async function runSessionReport(
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<SessionReport> {
   const { onProgress } = options
 
@@ -58,7 +58,7 @@ export async function runSessionReport(
     next_recommended: nextRec.command
   }
 
-  const reportPath = path.join(projectDir, '.atlas', 'context', 'session-report.md')
+  const reportPath = path.join(projectDir, '.quorum', 'context', 'session-report.md')
   const md = `# Session Report
 Date: ${today}
 
@@ -95,7 +95,7 @@ ${nextRec.command} — ${nextRec.reason}
   onProgress?.(`Est. cost: ${estimatedCost}`)
   onProgress?.(`Next: ${nextRec.command}`)
   onProgress?.('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  onProgress?.(`Full report: .atlas/context/session-report.md`)
+  onProgress?.(`Full report: .quorum/context/session-report.md`)
 
   return report
 }

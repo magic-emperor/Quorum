@@ -9,14 +9,14 @@ export class PlanManager {
   private cachedIndex: PlanIndex | null = null
 
   constructor(private projectDir: string) {
-    this.planFilePath = path.join(projectDir, '.atlas', 'implementation-plan.md')
-    this.planIndexPath = path.join(projectDir, '.atlas', 'plan-index.json')
+    this.planFilePath = path.join(projectDir, '.quorum', 'implementation-plan.md')
+    this.planIndexPath = path.join(projectDir, '.quorum', 'plan-index.json')
   }
 
   // ─── Initialization ──────────────────────────────────────────────────────────
 
   async initialize(): Promise<void> {
-    await mkdir(path.join(this.projectDir, '.atlas'), { recursive: true })
+    await mkdir(path.join(this.projectDir, '.quorum'), { recursive: true })
 
     if (!existsSync(this.planIndexPath)) {
       const emptyIndex: PlanIndex = {
@@ -158,7 +158,7 @@ ${what ? `What changed: ${what}` : ''}
     const currentPhase = await this.readCurrentPhase()
 
     if (index.phases.length === 0) {
-      return 'No implementation plan yet. Run atlas new to create one.'
+      return 'No implementation plan yet. Run quorum new to create one.'
     }
 
     const phaseSummaries = index.phases
@@ -178,7 +178,7 @@ ${phaseSummaries}`
   private async writePlanToFile(plan: PlanVersion): Promise<void> {
     const lines: string[] = [
       '# Implementation Plan',
-      '<!-- Created by atlas-planner BEFORE any code is written.',
+      '<!-- Created by quorum-lanner BEFORE any code is written.',
       '     Approved by human at planning checkpoint.',
       '     Tasks are generated FROM this plan.',
       '     APPEND ONLY. Never delete entries. -->',

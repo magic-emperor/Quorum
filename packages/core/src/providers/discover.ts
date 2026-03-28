@@ -1,7 +1,7 @@
 /**
  * Provider model discovery
  *
- * When a user adds an API key, ATLAS can call this module to:
+ * When a user adds an API key, QUORUM can call this module to:
  *  1. Validate the key works
  *  2. Discover what models are available
  *  3. Suggest the best model per quality tier (smart / balanced / fast)

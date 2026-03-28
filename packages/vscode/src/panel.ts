@@ -10,12 +10,12 @@ interface WebviewMessage {
 }
 
 /**
- * Sidebar WebviewView panel — the main ATLAS UI in the activity bar.
+ * Sidebar WebviewView panel — the main QUORUM UI in the activity bar.
  * Shows project state, quick actions, session info.
  * Communicates with the extension host via postMessage.
  */
-export class ATLASPanelProvider implements vscode.WebviewViewProvider {
-  public static readonly viewId = 'atlas.panel'
+export class QUORUMPanelProvider implements vscode.WebviewViewProvider {
+  public static readonly viewId = 'quorum.panel'
 
   private view?: vscode.WebviewView
   private onCommandCallback?: (command: string, description?: string, subcommand?: string) => void
@@ -58,20 +58,20 @@ export class ATLASPanelProvider implements vscode.WebviewViewProvider {
   refresh(): void {
     if (!this.view) return
 
-    const atlasDir = path.join(this.projectDir, '.atlas')
-    const initialized = fs.existsSync(atlasDir)
+    const quorumDir = path.join(this.projectDir, '.quorum')
+    const initialized = fs.existsSync(quorumDir)
     let taskSummary = 'No tasks yet'
     let goal = 'No goal defined'
 
     if (initialized) {
-      const goalPath = path.join(atlasDir, 'goal.md')
+      const goalPath = path.join(quorumDir, 'goal.md')
       if (fs.existsSync(goalPath)) {
         const goalContent = fs.readFileSync(goalPath, 'utf-8')
         goal = goalContent.split('\n').find(l => l.trim() && !l.startsWith('#')) ?? goal
         if (goal.length > 80) goal = goal.slice(0, 77) + '...'
       }
 
-      const taskIndexPath = path.join(atlasDir, 'task-index.json')
+      const taskIndexPath = path.join(quorumDir, 'task-index.json')
       if (fs.existsSync(taskIndexPath)) {
         try {
           const idx = JSON.parse(fs.readFileSync(taskIndexPath, 'utf-8')) as {
@@ -105,7 +105,7 @@ export class ATLASPanelProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ATLAS</title>
+  <title>QUORUM</title>
   <style nonce="${nonce}">
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -219,7 +219,7 @@ export class ATLASPanelProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div class="header">
-    <h2>ATLAS</h2>
+    <h2>QUORUM</h2>
     <span class="badge" id="badge">loading...</span>
   </div>
 
@@ -227,7 +227,7 @@ export class ATLASPanelProvider implements vscode.WebviewViewProvider {
   <div id="not-initialized" class="section">
     <div class="info-card">
       <div class="label">Project not initialized</div>
-      <div class="value">Run ATLAS: Initialize Project to set up .atlas/ and define your goal.</div>
+      <div class="value">Run QUORUM: Initialize Project to set up .quorum/ and define your goal.</div>
     </div>
     <br>
     <button class="btn primary" onclick="send('init')">Initialize Project</button>

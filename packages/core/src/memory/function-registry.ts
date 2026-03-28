@@ -17,7 +17,7 @@ export class FunctionRegistry {
 
   constructor(private projectDir: string) {
     this.registryPath = path.join(
-      projectDir, '.atlas', 'nervous-system', 'function-registry.json'
+      projectDir, '.quorum', 'nervous-system', 'function-registry.json'
     )
   }
 
@@ -144,7 +144,7 @@ export class FunctionRegistry {
         ignore: ['node_modules/**', 'dist/**', '**/*.test.*', '**/*.spec.*']
       })
     } catch {
-      // src/ may not exist in ATLAS repo itself — skip silently
+      // src/ may not exist in QUORUM repo itself — skip silently
       onProgress?.('Function registry: no src/ to scan')
       return
     }
@@ -254,7 +254,7 @@ export class FunctionRegistry {
           returns: { type: 'unknown', description: '' },
           called_from: [],
           calls: [],
-          agent_that_created: 'atlas-sync',
+          agent_that_created: 'quorum-sync',
           session: sessionId,
           last_modified_session: sessionId,
           deleted: false,

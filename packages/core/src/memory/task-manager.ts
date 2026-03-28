@@ -9,14 +9,14 @@ export class TaskManager {
   private cachedIndex: TaskIndex | null = null
 
   constructor(private projectDir: string) {
-    this.taskFilePath = path.join(projectDir, '.atlas', 'task.md')
-    this.taskIndexPath = path.join(projectDir, '.atlas', 'task-index.json')
+    this.taskFilePath = path.join(projectDir, '.quorum', 'task.md')
+    this.taskIndexPath = path.join(projectDir, '.quorum', 'task-index.json')
   }
 
   // ─── Initialization ──────────────────────────────────────────────────────────
 
   async initialize(): Promise<void> {
-    await mkdir(path.join(this.projectDir, '.atlas'), { recursive: true })
+    await mkdir(path.join(this.projectDir, '.quorum'), { recursive: true })
 
     if (!existsSync(this.taskFilePath)) {
       await writeFile(this.taskFilePath, this.getInitialTaskTemplate(), 'utf-8')
@@ -186,7 +186,7 @@ export class TaskManager {
 
     const affectedFiles = this.inferAffectedFiles(description, folderScope, candidates)
 
-    const planIndexPath = path.join(this.projectDir, '.atlas', 'plan-index.json')
+    const planIndexPath = path.join(this.projectDir, '.quorum', 'plan-index.json')
     let recommendedPhase = 'current'
     if (existsSync(planIndexPath)) {
       const planIndexRaw = await readFile(planIndexPath, 'utf-8')
@@ -326,7 +326,7 @@ Total tasks: ${index.total} | Next ID: TASK-${String(index.next_task_number).pad
 
     const existing = existsSync(folderTasksFile)
       ? await readFile(folderTasksFile, 'utf-8')
-      : `# Tasks — ${task.folder_scope}\n<!-- Append only. References global task IDs from /.atlas/task.md -->\n\n`
+      : `# Tasks — ${task.folder_scope}\n<!-- Append only. References global task IDs from /.quorum/task.md -->\n\n`
 
     const entry = `
 ## ${task.id} — ${task.title}

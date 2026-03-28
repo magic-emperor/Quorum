@@ -1,7 +1,7 @@
 {
-  "name": "@atlas/core",
+  "name": "@quorum/core",
   "version": "1.1.0",
-  "description": "ATLAS core engine — autonomous multi-agent development framework",
+  "description": "QUORUM core engine — autonomous multi-agent development framework",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -6,6 +6,23 @@ dist/
 .env
 .env.local
 
-# ATLAS config contains real API keys — NEVER commit this file
-# Use atlas.config.example.json as the committed template instead
+# QUORUM config contains real API keys — NEVER commit this file
+# Use quorum.config.example.json as the committed template instead
+quorum.config.json
 atlas.config.json
+
+# Runtime directory — session data, plans, memory, API keys cache
+.atlas/
+.quorum/
+
+# Database files — auto-generated, never commit
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Legacy standalone Telegram bot — replaced by apps/quorum-bot
+apps/telegram-bot/
+
+# Generated output files
+output.ts

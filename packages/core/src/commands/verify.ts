@@ -1,16 +1,16 @@
 import { writeFile } from 'fs/promises'
 import path from 'path'
-import type { ATLASRunOptions, VerifyResult, VerifyItem } from '../types.js'
+import type { QUORUMRunOptions, VerifyResult, VerifyItem } from '../types.js'
 import { TaskManager } from '../memory/task-manager.js'
 import { PlanManager } from '../memory/plan-manager.js'
 
 export async function runVerify(
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<VerifyResult> {
   const { onProgress, onCheckpoint } = options
 
-  onProgress?.('ATLAS Verification — User Acceptance Testing')
+  onProgress?.('QUORUM Verification — User Acceptance Testing')
   onProgress?.('Walk through each deliverable and confirm it works.')
   onProgress?.('')
 
@@ -30,7 +30,7 @@ export async function runVerify(
 
   if (completedTasks.length === 0) {
     onProgress?.('No completed tasks found to verify.')
-    onProgress?.('Complete some tasks first with atlas new or atlas fast.')
+    onProgress?.('Complete some tasks first with quorum new or atlas fast.')
     return { deliverables: [], passed: 0, failed: 0, skipped: 0, ready_to_ship: false }
   }
 
@@ -96,7 +96,7 @@ export async function runVerify(
 
   const readyToShip = failed === 0 && passed > 0
 
-  const reportPath = path.join(projectDir, '.atlas', 'context', 'verify-report.md')
+  const reportPath = path.join(projectDir, '.quorum', 'context', 'verify-report.md')
   const md = `# Verification Report
 Date: ${new Date().toISOString()}
 Phase: ${planIndex.current_phase}
@@ -120,9 +120,9 @@ ${items.map(i => {
   onProgress?.(`Verification complete: ${passed} passed, ${failed} failed, ${skipped} skipped`)
 
   if (readyToShip) {
-    onProgress?.('Ready to ship. Run: atlas ship')
+    onProgress?.('Ready to ship. Run: quorum ship')
   } else if (failed > 0) {
-    onProgress?.(`Fix ${failed} failing item(s), then run atlas verify again.`)
+    onProgress?.(`Fix ${failed} failing item(s), then run quorum verify again.`)
   }
 
   return { deliverables: items, passed, failed, skipped, ready_to_ship: readyToShip }

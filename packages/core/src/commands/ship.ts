@@ -3,7 +3,7 @@ import { existsSync } from 'fs'
 import path from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import type { ATLASRunOptions, RoutingTable } from '../types.js'
+import type { QUORUMRunOptions, RoutingTable } from '../types.js'
 import { AgentRunner } from '../agent-runner.js'
 import { TaskManager } from '../memory/task-manager.js'
 import { PlanManager } from '../memory/plan-manager.js'
@@ -15,7 +15,7 @@ export async function runShip(
   projectDir: string,
   agentsDir: string,
   routingTable: RoutingTable,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress, onCheckpoint } = options
   const draft = options.extra?.draft === 'true'
@@ -32,10 +32,10 @@ export async function runShip(
     nervousSystem.readDecisions()
   ])
 
-  const verifyPath = path.join(projectDir, '.atlas', 'context', 'verify-report.md')
+  const verifyPath = path.join(projectDir, '.quorum', 'context', 'verify-report.md')
   if (!existsSync(verifyPath) && !options.auto) {
     onProgress?.('No verification report found.')
-    onProgress?.('Run atlas verify first, then atlas ship.')
+    onProgress?.('Run quorum verify first, then quorum ship.')
     return
   }
 
@@ -46,7 +46,7 @@ export async function runShip(
   onProgress?.('Generating PR description...')
 
   const prResponse = await agentRunner.run({
-    agentName: 'atlas-nervous-system',
+    agentName: 'quorum-nervous-system',
     userMessage: `Generate a PR title and description for these changes.
 
 Completed tasks:
@@ -103,14 +103,14 @@ BODY:
     onProgress?.('')
     onProgress?.('GitHub CLI (gh) not found. Install from: cli.github.com')
     onProgress?.('')
-    onProgress?.('PR content saved to .atlas/context/pr-draft.md')
-    const prDraftPath = path.join(projectDir, '.atlas', 'context', 'pr-draft.md')
+    onProgress?.('PR content saved to .quorum/context/pr-draft.md')
+    const prDraftPath = path.join(projectDir, '.quorum', 'context', 'pr-draft.md')
     await writeFile(prDraftPath, `# PR: ${prTitle}\n\n${prBody}`, 'utf-8')
     return
   }
 
   const draftFlag = draft ? '--draft' : ''
-  const bodyTempPath = path.join(projectDir, '.atlas', 'context', 'pr-body-temp.md')
+  const bodyTempPath = path.join(projectDir, '.quorum', 'context', 'pr-body-temp.md')
   await writeFile(bodyTempPath, prBody, 'utf-8')
 
   try {
@@ -128,7 +128,7 @@ BODY:
       id: `a_ship_${Date.now()}`,
       type: 'action',
       what: `PR created: ${prTitle}`,
-      agent: 'atlas-ship',
+      agent: 'quorum-ship',
       status: 'completed',
       output: stdout.trim(),
       session: `ship_${Date.now()}`,
@@ -138,8 +138,8 @@ BODY:
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
     onProgress?.(`gh pr create failed: ${error}`)
-    onProgress?.('PR content saved to .atlas/context/pr-draft.md')
-    const prDraftPath = path.join(projectDir, '.atlas', 'context', 'pr-draft.md')
+    onProgress?.('PR content saved to .quorum/context/pr-draft.md')
+    const prDraftPath = path.join(projectDir, '.quorum', 'context', 'pr-draft.md')
     await writeFile(prDraftPath, `# PR: ${prTitle}\n\n${prBody}`, 'utf-8')
   }
 }

@@ -1,0 +1,22 @@
+{
+  "name": "@quorum/collaboration",
+  "version": "1.1.0",
+  "description": "QUORUM collaboration layer — team chat to plan approval to execution pipeline",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@quorum/core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.2"
+  }
+}

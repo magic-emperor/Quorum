@@ -1,19 +1,19 @@
 import * as vscode from 'vscode'
 import * as path from 'path'
-import { ATLASOutputChannel } from './output-channel'
-import { ATLASStatusBar } from './status-bar'
-import { ATLASPanelProvider } from './panel'
+import { QUORUMOutputChannel } from './output-channel'
+import { QUORUMStatusBar } from './status-bar'
+import { QUORUMPanelProvider } from './panel'
 import { EngineClient } from './engine-client'
 
-let outputChannel: ATLASOutputChannel | undefined
-let statusBar: ATLASStatusBar | undefined
-let panelProvider: ATLASPanelProvider | undefined
+let outputChannel: QUORUMOutputChannel | undefined
+let statusBar: QUORUMStatusBar | undefined
+let panelProvider: QUORUMPanelProvider | undefined
 let engineClient: EngineClient | undefined
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getProjectDir(): string {
-  const cfg = vscode.workspace.getConfiguration('atlas')
+  const cfg = vscode.workspace.getConfiguration('quorum')
   const override = cfg.get<string>('projectDir')
   if (override) return override
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd()
@@ -36,7 +36,7 @@ async function runWithPrompt(
 
   if (opts.needsDescription) {
     description = await vscode.window.showInputBox({
-      title: `ATLAS: ${command}`,
+      title: `QUORUM: ${command}`,
       prompt: promptText,
       ignoreFocusOut: true,
       placeHolder: promptText
@@ -60,7 +60,7 @@ async function runWithPrompt(
     const msg = err instanceof Error ? err.message : String(err)
     statusBar?.setError(msg)
     outputChannel?.appendLine(`\n✗ Error: ${msg}`)
-    void vscode.window.showErrorMessage(`ATLAS ${command} failed: ${msg}`)
+    void vscode.window.showErrorMessage(`QUORUM ${command} failed: ${msg}`)
   }
 }
 
@@ -70,9 +70,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const projectDir = getProjectDir()
 
   // Core services
-  outputChannel = new ATLASOutputChannel()
-  statusBar = new ATLASStatusBar()
-  panelProvider = new ATLASPanelProvider(context.extensionUri, projectDir)
+  outputChannel = new QUORUMOutputChannel()
+  statusBar = new QUORUMStatusBar()
+  panelProvider = new QUORUMPanelProvider(context.extensionUri, projectDir)
 
   // Wire panel command handler (messages from the webview button clicks)
   panelProvider.onCommand(async (command, description, _subcommand) => {
@@ -91,40 +91,40 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register sidebar panel
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ATLASPanelProvider.viewId, panelProvider)
+    vscode.window.registerWebviewViewProvider(QUORUMPanelProvider.viewId, panelProvider)
   )
 
   // ─── Register all 24 commands ──────────────────────────────────────────────
 
   const cmds: Array<[string, () => Promise<void>]> = [
 
-    ['atlas.new', () => runWithPrompt('new',
+    ['quorum.new', () => runWithPrompt('new',
       'Describe what to build', { needsDescription: true })],
 
-    ['atlas.enhance', () => runWithPrompt('enhance',
+    ['quorum.enhance', () => runWithPrompt('enhance',
       'What do you want to enhance?', { needsDescription: true })],
 
-    ['atlas.fast', () => runWithPrompt('fast',
+    ['quorum.fast', () => runWithPrompt('fast',
       'Quick task (< 5 files)', { needsDescription: true })],
 
-    ['atlas.next', () => runWithPrompt('next', '')],
+    ['quorum.next', () => runWithPrompt('next', '')],
 
-    ['atlas.init', () => runWithPrompt('init', '')],
+    ['quorum.init', () => runWithPrompt('init', '')],
 
-    ['atlas.doctor', () => runWithPrompt('doctor', '')],
+    ['quorum.doctor', () => runWithPrompt('doctor', '')],
 
-    ['atlas.status', () => runWithPrompt('status', '')],
+    ['quorum.status', () => runWithPrompt('status', '')],
 
-    ['atlas.discuss', () => runWithPrompt('discuss',
+    ['quorum.discuss', () => runWithPrompt('discuss',
       'What feature do you want to discuss?', { needsDescription: true })],
 
-    ['atlas.verify', () => runWithPrompt('verify', '')],
+    ['quorum.verify', () => runWithPrompt('verify', '')],
 
-    ['atlas.ship', async () => {
+    ['quorum.ship', async () => {
       const draft = await vscode.window.showQuickPick(
         [{ label: 'Create PR', description: 'Open for review' },
          { label: 'Create draft PR', description: 'Mark as draft' }],
-        { title: 'ATLAS: Ship', placeHolder: 'Select PR type' }
+        { title: 'QUORUM: Ship', placeHolder: 'Select PR type' }
       )
       if (!draft) return
       const isDraft = draft.label.includes('draft')
@@ -139,7 +139,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }],
 
-    ['atlas.review', async () => {
+    ['quorum.review', async () => {
       const filePath = vscode.window.activeTextEditor?.document.uri.fsPath
       const reviewPath = filePath
         ? path.relative(getProjectDir(), filePath)
@@ -155,22 +155,22 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }],
 
-    ['atlas.map', () => runWithPrompt('map', '')],
+    ['quorum.map', () => runWithPrompt('map', '')],
 
-    ['atlas.debug', () => runWithPrompt('debug',
+    ['quorum.debug', () => runWithPrompt('debug',
       'Describe the bug or error', { needsDescription: true })],
 
-    ['atlas.sessionReport', () => runWithPrompt('session-report', '')],
+    ['quorum.sessionReport', () => runWithPrompt('session-report', '')],
 
-    ['atlas.pause', () => runWithPrompt('pause', '')],
+    ['quorum.pause', () => runWithPrompt('pause', '')],
 
-    ['atlas.resume', () => runWithPrompt('resume', '')],
+    ['quorum.resume', () => runWithPrompt('resume', '')],
 
-    ['atlas.sync', () => runWithPrompt('sync', '')],
+    ['quorum.sync', () => runWithPrompt('sync', '')],
 
-    ['atlas.rollback', async () => {
+    ['quorum.rollback', async () => {
       const point = await vscode.window.showInputBox({
-        title: 'ATLAS: Rollback',
+        title: 'QUORUM: Rollback',
         prompt: 'Rollback point ID (leave empty to list available points)',
         placeHolder: 'rp_001_architecture_approved',
         ignoreFocusOut: true
@@ -189,14 +189,14 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }],
 
-    ['atlas.agents', () => runWithPrompt('agents', '')],
+    ['quorum.agents', () => runWithPrompt('agents', '')],
 
-    ['atlas.profile', async () => {
+    ['quorum.profile', async () => {
       const profile = await vscode.window.showQuickPick(
         [{ label: 'fast',      description: 'Groq/fast models — cheap, quick' },
          { label: 'balanced',  description: 'Mixed — default' },
          { label: 'quality',   description: 'Best models — Claude/GPT-4o' }],
-        { title: 'ATLAS: Switch Profile', placeHolder: 'Select model quality tier' }
+        { title: 'QUORUM: Switch Profile', placeHolder: 'Select model quality tier' }
       )
       if (!profile) return
       const engine = getEngine()
@@ -210,23 +210,23 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }],
 
-    ['atlas.seed', () => runWithPrompt('seed',
+    ['quorum.seed', () => runWithPrompt('seed',
       'What idea do you want to capture?', { needsDescription: true })],
 
-    ['atlas.note', () => runWithPrompt('note',
+    ['quorum.note', () => runWithPrompt('note',
       'Quick note text', { needsDescription: true })],
 
-    ['atlas.backlog', async () => {
+    ['quorum.backlog', async () => {
       const sub = await vscode.window.showQuickPick(
         [{ label: 'list', description: 'Show all backlog items' },
          { label: 'add',  description: 'Add a new backlog item' }],
-        { title: 'ATLAS: Backlog' }
+        { title: 'QUORUM: Backlog' }
       )
       if (!sub) return
       let description: string | undefined
       if (sub.label === 'add') {
         description = await vscode.window.showInputBox({
-          title: 'ATLAS: Backlog Add',
+          title: 'QUORUM: Backlog Add',
           prompt: 'What should be added to the backlog?',
           ignoreFocusOut: true
         })
@@ -243,8 +243,8 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }],
 
-    ['atlas.showPanel', () => {
-      void vscode.commands.executeCommand('atlas.panel.focus')
+    ['quorum.showPanel', () => {
+      void vscode.commands.executeCommand('quorum.panel.focus')
       return Promise.resolve()
     }]
   ]
@@ -262,9 +262,9 @@ export function activate(context: vscode.ExtensionContext): void {
   )
 
   // Auto-open panel if configured
-  const cfg = vscode.workspace.getConfiguration('atlas')
+  const cfg = vscode.workspace.getConfiguration('quorum')
   if (cfg.get<boolean>('autoOpen')) {
-    void vscode.commands.executeCommand('atlas.panel.focus')
+    void vscode.commands.executeCommand('quorum.panel.focus')
   }
 
   // Handle workspace folder changes — reset engine client
@@ -275,9 +275,9 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   )
 
-  outputChannel.appendLine('ATLAS extension activated.')
+  outputChannel.appendLine('QUORUM extension activated.')
   outputChannel.appendLine(`Project: ${projectDir}`)
-  outputChannel.appendLine('Run F1 → ATLAS: New Feature to get started.')
+  outputChannel.appendLine('Run F1 → QUORUM: New Feature to get started.')
 }
 
 // ─── Deactivate ──────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { writeFile } from 'fs/promises'
 import path from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import type { ATLASRunOptions, RoutingTable } from '../types.js'
+import type { QUORUMRunOptions, RoutingTable } from '../types.js'
 import { AgentRunner } from '../agent-runner.js'
 import { NervousSystem } from '../memory/nervous-system.js'
 import { GoalGuardian } from '../memory/goal-guardian.js'
@@ -13,7 +13,7 @@ export async function runReview(
   projectDir: string,
   agentsDir: string,
   routingTable: RoutingTable,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress, onAgentOutput } = options
   const targetPath = options.description
@@ -71,7 +71,7 @@ ${targetPath ? `FOCUSED ON: ${targetPath}` : 'REVIEWING: all uncommitted changes
 
   onProgress?.('Running code quality review...')
   const codeResponse = await agentRunner.run({
-    agentName: 'atlas-critic',
+    agentName: 'quorum-critic',
     userMessage: `Code review mode — review these changes for:
 1. Logic errors and edge cases
 2. Missing error handling
@@ -86,11 +86,11 @@ ${reviewContext}`,
     onProgress
   })
 
-  onAgentOutput?.('atlas-critic (code review)', codeResponse.content)
+  onAgentOutput?.('quorum-critic (code review)', codeResponse.content)
 
   onProgress?.('Running security review...')
   const securityResponse = await agentRunner.run({
-    agentName: 'atlas-critic',
+    agentName: 'quorum-critic',
     userMessage: `Security review mode — check these changes for:
 1. Injection vulnerabilities (SQL, command, XSS)
 2. Authentication and authorization flaws
@@ -105,9 +105,9 @@ ${reviewContext}`,
     onProgress
   })
 
-  onAgentOutput?.('atlas-critic (security review)', securityResponse.content)
+  onAgentOutput?.('quorum-critic (security review)', securityResponse.content)
 
-  const reportPath = path.join(projectDir, '.atlas', 'context', 'review-report.md')
+  const reportPath = path.join(projectDir, '.quorum', 'context', 'review-report.md')
   const report = `# Code Review Report
 Date: ${new Date().toISOString()}
 ${targetPath ? `Scope: ${targetPath}` : 'Scope: all uncommitted changes'}
@@ -126,5 +126,5 @@ ${diffContext}
   await writeFile(reportPath, report, 'utf-8')
 
   onProgress?.('')
-  onProgress?.(`Review complete. Report saved to .atlas/context/review-report.md`)
+  onProgress?.(`Review complete. Report saved to .quorum/context/review-report.md`)
 }

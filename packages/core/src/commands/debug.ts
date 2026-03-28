@@ -1,6 +1,6 @@
 import { writeFile } from 'fs/promises'
 import path from 'path'
-import type { ATLASRunOptions, RoutingTable } from '../types.js'
+import type { QUORUMRunOptions, RoutingTable } from '../types.js'
 import { AgentRunner } from '../agent-runner.js'
 import { NervousSystem } from '../memory/nervous-system.js'
 import { TaskManager } from '../memory/task-manager.js'
@@ -10,7 +10,7 @@ export async function runDebug(
   projectDir: string,
   agentsDir: string,
   routingTable: RoutingTable,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress, onAgentOutput, onCheckpoint } = options
 
@@ -62,7 +62,7 @@ export async function runDebug(
     onProgress?.(`Debug attempt ${attempt}/${maxAttempts}...`)
 
     const debugResponse = await agentRunner.run({
-      agentName: 'atlas-backend-architect',
+      agentName: 'quorum-backend-architect',
       userMessage: `DEBUGGING MODE — systematic bug investigation.
 
 Bug description: ${description}
@@ -95,7 +95,7 @@ PREVENTION: [what to check in future to avoid this]`,
     })
 
     lastDebugContent = debugResponse.content
-    onAgentOutput?.(`atlas-backend-architect (debug attempt ${attempt})`, debugResponse.content)
+    onAgentOutput?.(`quorum-backend-architect (debug attempt ${attempt})`, debugResponse.content)
 
     const hasRootCause = debugResponse.content.includes('ROOT CAUSE:')
     const hasFix = debugResponse.content.includes('FIX:')
@@ -115,12 +115,12 @@ PREVENTION: [what to check in future to avoid this]`,
             { label: 'APPLY FIX', tradeoff: 'Agent applies the fix directly' },
             { label: 'SHOW ME THE FIX', tradeoff: 'Show the fix without applying' }
           ],
-          supportingDoc: '.atlas/BUGS.md'
+          supportingDoc: '.quorum/BUGS.md'
         })
 
         if (response.toUpperCase().includes('APPLY') || response === 'A') {
           await agentRunner.run({
-            agentName: 'atlas-backend-architect',
+            agentName: 'quorum-backend-architect',
             userMessage: `Apply this fix:
 ${debugResponse.content}
 
@@ -152,14 +152,14 @@ Apply the exact fix described. Change only what is needed. Nothing more.`,
       root_cause: lastDebugContent.match(/ROOT CAUSE:\s*(.+)/)?.[1] ?? 'Unknown',
       fix_applied: debugResolved ? 'Applied in debug session' : undefined,
       session: sessionId,
-      found_by: 'atlas-debug'
+      found_by: 'quorum-debug'
     })
   }
 
   if (!debugResolved) {
     onProgress?.('')
     onProgress?.('Could not resolve automatically after 3 attempts.')
-    onProgress?.('Check .atlas/BUGS.md for full diagnosis.')
+    onProgress?.('Check .quorum/BUGS.md for full diagnosis.')
     onProgress?.('The debug session has been saved — review agent output above.')
   }
 }

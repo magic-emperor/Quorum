@@ -1,11 +1,11 @@
-# ATLAS Local Testing Guide
+# QUORUM Local Testing Guide
 
 ## What's Running
 
 | Service | URL | Status |
 |---------|-----|--------|
-| atlas-server (API + Socket.IO) | http://localhost:3001 | Start with `npm run dev` in `apps/atlas-server/` |
-| atlas-web (React dashboard) | http://localhost:3000 | Start with `npx vite` in `apps/atlas-web/` |
+| quorum-server (API + Socket.IO) | http://localhost:3001 | Start with `npm run dev` in `apps/quorum-server/` |
+| quorum-web (React dashboard) | http://localhost:3000 | Start with `npx vite` in `apps/quorum-web/` |
 
 **Starting both (do in this order):**
 ```bash
@@ -14,11 +14,11 @@
 Get-NetTCPConnection -LocalPort 3000,3001 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 
 # Terminal 1 — Start server FIRST
-cd apps/atlas-server
+cd apps/quorum-server
 npm run dev
 
 # Terminal 2 — Start web AFTER (once server shows "running on port 3001")
-cd apps/atlas-web
+cd apps/quorum-web
 npx vite --port 3000 --strictPort
 ```
 
@@ -30,12 +30,12 @@ npx vite --port 3000 --strictPort
 
 1. Go to http://localhost:3000, log in
 2. Click **▶ Run Command** in the header
-3. Select a command (`atlas doctor` is the quickest — no AI key needed)
-4. Fill in the project directory (e.g. `D:\Atlas\ATLAS-CLAUDE`)
+3. Select a command (`quorum doctor` is the quickest — no AI key needed)
+4. Fill in the project directory (e.g. `D:\Atlas\QUORUM-CLAUDE`)
 5. Check `--auto` to skip checkpoints
 6. Click **▶ Run** — you'll see live terminal output streamed via Socket.IO
 
-> **Note:** Commands that need AI (like `atlas new`) require an API key. Go to the **API Keys** page first and save your `ANTHROPIC_API_KEY` (or whichever provider you use).
+> **Note:** Commands that need AI (like `quorum new`) require an API key. Go to the **API Keys** page first and save your `ANTHROPIC_API_KEY` (or whichever provider you use).
 
 ---
 
@@ -47,7 +47,7 @@ npx vite --port 3000 --strictPort
    ```
    Follow prompts → get your token like: `7123456789:AAFxxxxxxxxxxxxxxxx`
 
-2. **Set token in .env** — edit `apps/atlas-server/.env`:
+2. **Set token in .env** — edit `apps/quorum-server/.env`:
    ```
    TELEGRAM_BOT_TOKEN=7123456789:AAFxxxxxxxxxxxxxxxx
    PUBLIC_URL=http://localhost:3001
@@ -55,8 +55,8 @@ npx vite --port 3000 --strictPort
 
 3. **Restart the server** — you should see:
    ```
-   ATLAS Telegram Bot started
-   ATLAS Server running on port 3001
+   QUORUM Telegram Bot started
+   QUORUM Server running on port 3001
    ```
 
 4. **Test the bot** — open Telegram, find your bot and send:
@@ -65,7 +65,7 @@ npx vite --port 3000 --strictPort
    /login      ← bot sends a link: http://localhost:3001/api/auth/telegram/link?token=xxx
    ```
 
-5. **Link your account** — open the link in a browser where you're already logged into ATLAS Console. If you're not logged in, log in first then revisit the link.
+5. **Link your account** — open the link in a browser where you're already logged into QUORUM Console. If you're not logged in, log in first then revisit the link.
 
 6. **Test from Telegram:**
    ```
@@ -81,7 +81,7 @@ npx vite --port 3000 --strictPort
 
 ---
 
-## How to Test the Mobile App (atlas-console)
+## How to Test the Mobile App (quorum-console)
 
 ### Prerequisites
 - Install [Expo Go](https://expo.dev/go) on your iPhone or Android phone
@@ -91,13 +91,13 @@ npx vite --port 3000 --strictPort
 
 1. **Install deps:**
    ```bash
-   cd apps/atlas-console
+   cd apps/quorum-console
    npx expo install
    ```
 
-2. **Set server URL** — create `apps/atlas-console/.env`:
+2. **Set server URL** — create `apps/quorum-console/.env`:
    ```
-   EXPO_PUBLIC_ATLAS_SERVER=http://YOUR_MACHINE_IP:3001
+   EXPO_PUBLIC_QUORUM_SERVER=http://YOUR_MACHINE_IP:3001
    ```
    Find your IP: `ipconfig` → look for IPv4 Address (e.g. `192.168.1.5`)
 
@@ -109,13 +109,13 @@ npx vite --port 3000 --strictPort
 4. **On your phone:**
    - Open Expo Go
    - Scan the QR code shown in terminal
-   - The ATLAS Console app loads
+   - The QUORUM Console app loads
 
-5. **Log in** with `test@atlas.dev` / `atlastest123`
+5. **Log in** with `test@quorum.dev` / `atlastest123`
 
 6. **Run a command:**
    - Tap the terminal input at the bottom
-   - Type: `atlas doctor "D:\\Atlas\\ATLAS-CLAUDE"`
+   - Type: `quorum doctor "D:\\Atlas\\QUORUM-CLAUDE"`
    - Watch live output stream
 
 7. **Test Telegram link from mobile:**

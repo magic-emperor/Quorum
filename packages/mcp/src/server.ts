@@ -7,11 +7,11 @@ import {
   ListToolsRequestSchema,
   type CallToolRequest
 } from '@modelcontextprotocol/sdk/types.js'
-import { ATLASEngine, FunctionRegistry } from '@atlas/core'
+import { QUORUMEngine, FunctionRegistry } from '@quorum/core'
 import path from 'path'
 
 const server = new Server(
-  { name: 'atlas', version: '1.0.0' },
+  { name: 'quorum', version: '1.0.0' },
   { capabilities: { tools: {} } }
 )
 
@@ -20,8 +20,8 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
-      name: 'atlas_new',
-      description: 'Build a new feature or application from scratch. Runs the full ATLAS pipeline: scope check → plan → architecture → design → build → integrate → test.',
+      name: 'quorum_new',
+      description: 'Build a new feature or application from scratch. Runs the full QUORUM pipeline: scope check → plan → architecture → design → build → integrate → test.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -33,7 +33,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_enhance',
+      name: 'quorum_enhance',
       description: 'Modify or extend an existing feature. Loads full project context, runs scope guard, uses function registry for cheap navigation, makes targeted changes.',
       inputSchema: {
         type: 'object',
@@ -45,7 +45,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_fast',
+      name: 'quorum_fast',
       description: 'Execute a small task directly without the full pipeline. Best for < 5 file changes.',
       inputSchema: {
         type: 'object',
@@ -57,7 +57,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_next',
+      name: 'quorum_next',
       description: 'Auto-detect what to do next based on current project state.',
       inputSchema: {
         type: 'object',
@@ -65,8 +65,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_status',
-      description: 'Show current ATLAS state — tasks, plan progress, model routing.',
+      name: 'quorum_status',
+      description: 'Show current QUORUM state — tasks, plan progress, model routing.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -78,7 +78,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_task_list',
+      name: 'quorum_task_list',
       description: 'List all project tasks with their status.',
       inputSchema: {
         type: 'object',
@@ -93,7 +93,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_goal',
+      name: 'quorum_goal',
       description: 'Read the project goal definition — what is in scope and what is not.',
       inputSchema: {
         type: 'object',
@@ -101,7 +101,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_discuss',
+      name: 'quorum_discuss',
       description: 'Gather context and surface important questions BEFORE planning starts. Prevents wrong assumptions.',
       inputSchema: {
         type: 'object',
@@ -113,7 +113,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_debug',
+      name: 'quorum_debug',
       description: 'Systematic debugging — traces root cause and proposes targeted fix.',
       inputSchema: {
         type: 'object',
@@ -126,7 +126,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_review',
+      name: 'quorum_review',
       description: 'Code + security review of uncommitted changes.',
       inputSchema: {
         type: 'object',
@@ -137,7 +137,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_functions',
+      name: 'quorum_functions',
       description: 'Query the function registry — find any function by name, file, or purpose. 98.8% cheaper than reading source files directly.',
       inputSchema: {
         type: 'object',
@@ -149,7 +149,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_rollback',
+      name: 'quorum_rollback',
       description: 'Return project to a previous rollback point. Lists points if no ID given.',
       inputSchema: {
         type: 'object',
@@ -161,7 +161,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_session_report',
+      name: 'quorum_session_report',
       description: 'Generate summary of what was done this session.',
       inputSchema: {
         type: 'object',
@@ -169,8 +169,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       }
     },
     {
-      name: 'atlas_doctor',
-      description: 'Check ATLAS health — API keys, Playwright, .atlas/ integrity.',
+      name: 'quorum_doctor',
+      description: 'Check QUORUM health — API keys, Playwright, .quorum/ integrity.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -195,12 +195,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
   const outputLines: string[] = []
   const collect = (msg: string) => outputLines.push(msg)
 
-  const engine = new ATLASEngine({ projectDir })
+  const engine = new QUORUMEngine({ projectDir })
   const autoCheckpoint = async () => 'APPROVE'
 
   try {
     switch (name) {
-      case 'atlas_new':
+      case 'quorum_new':
         await engine.run({
           command: 'new',
           description: String(a['description'] ?? ''),
@@ -211,7 +211,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         })
         break
 
-      case 'atlas_enhance':
+      case 'quorum_enhance':
         await engine.run({
           command: 'enhance',
           description: String(a['description'] ?? ''),
@@ -221,7 +221,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         })
         break
 
-      case 'atlas_fast':
+      case 'quorum_fast':
         await engine.run({
           command: 'fast',
           description: String(a['description'] ?? ''),
@@ -230,11 +230,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         })
         break
 
-      case 'atlas_next':
+      case 'quorum_next':
         await engine.run({ command: 'next', projectDir, onProgress: collect })
         break
 
-      case 'atlas_status':
+      case 'quorum_status':
         await engine.run({
           command: 'status',
           projectDir,
@@ -247,7 +247,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         })
         break
 
-      case 'atlas_task_list': {
+      case 'quorum_task_list': {
         await engine.initialize()
         const tm = (engine as unknown as { taskManager: { readIndex: () => Promise<{ tasks: Array<{ id: string; title: string; status: string }> }> } }).taskManager
         if (tm) {
@@ -266,19 +266,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         break
       }
 
-      case 'atlas_goal': {
+      case 'quorum_goal': {
         await engine.initialize()
         const gg = (engine as unknown as { goalGuardian: { readRaw?: () => Promise<string> } }).goalGuardian
         if (gg?.readRaw) {
           const raw = await gg.readRaw()
-          outputLines.push(raw || 'No goal.md found. Run: atlas init')
+          outputLines.push(raw || 'No goal.md found. Run: quorum init')
         } else {
-          outputLines.push('No goal guardian available. Run: atlas init')
+          outputLines.push('No goal guardian available. Run: quorum init')
         }
         break
       }
 
-      case 'atlas_discuss':
+      case 'quorum_discuss':
         await engine.run({
           command: 'discuss',
           description: String(a['feature'] ?? ''),
@@ -287,7 +287,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         })
         break
 
-      case 'atlas_debug':
+      case 'quorum_debug':
         await engine.run({
           command: 'debug',
           description: String(a['description'] ?? ''),
@@ -298,7 +298,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         })
         break
 
-      case 'atlas_review':
+      case 'quorum_review':
         await engine.run({
           command: 'review',
           description: typeof a['path'] === 'string' ? a['path'] : undefined,
@@ -307,7 +307,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         })
         break
 
-      case 'atlas_functions': {
+      case 'quorum_functions': {
         const fr = new FunctionRegistry(projectDir)
         const query = String(a['query'] ?? '')
         const byName = await fr.findByName(query)
@@ -316,7 +316,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
 
         if (results.length === 0) {
           outputLines.push(`No functions found matching: ${query}`)
-          outputLines.push('Tip: run atlas sync to build the function registry first.')
+          outputLines.push('Tip: run quorum sync to build the function registry first.')
         } else {
           outputLines.push(`Found ${results.length} function(s):`)
           results.forEach(f => {
@@ -325,7 +325,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
             outputLines.push(`  Purpose: ${f.purpose}`)
             outputLines.push(`  Tags: ${f.tags.join(', ')}`)
             if (f.called_from.length > 0) {
-              outputLines.push(`  Called from: ${f.called_from.map(c => `${c.file}:${c.line}`).join(', ')}`)
+              outputLines.push(`  Called from: ${f.called_from.map((c: { file: string; line: number }) => `${c.file}:${c.line}`).join(', ')}`)
             }
             outputLines.push('')
           })
@@ -333,7 +333,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         break
       }
 
-      case 'atlas_rollback':
+      case 'quorum_rollback':
         await engine.run({
           command: 'rollback',
           description: typeof a['rollback_point'] === 'string' ? a['rollback_point'] : undefined,
@@ -344,11 +344,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         })
         break
 
-      case 'atlas_session_report':
+      case 'quorum_session_report':
         await engine.run({ command: 'session-report', projectDir, onProgress: collect })
         break
 
-      case 'atlas_doctor':
+      case 'quorum_doctor':
         await engine.run({
           command: 'doctor',
           projectDir,
@@ -374,10 +374,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
 async function main() {
   const transport = new StdioServerTransport()
   await server.connect(transport)
-  process.stderr.write('ATLAS MCP server running on stdio\n')
+  process.stderr.write('QUORUM MCP server running on stdio\n')
 }
 
 main().catch(err => {
-  process.stderr.write(`ATLAS MCP error: ${err}\n`)
+  process.stderr.write(`QUORUM MCP error: ${err}\n`)
   process.exit(1)
 })

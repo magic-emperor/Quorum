@@ -1,22 +1,22 @@
 import * as vscode from 'vscode'
-import { ATLASEngine } from '@atlas/core'
-import type { ATLASRunOptions } from '@atlas/core'
+import { QUORUMEngine } from '@quorum/core'
+import type { QUORUMRunOptions } from '@quorum/core'
 
 /**
- * Wraps ATLASEngine for use in the VS Code extension host.
+ * Wraps QUORUMEngine for use in the VS Code extension host.
  * Bridges VS Code APIs (workspace, progress, input boxes) with the core engine.
  */
 export class EngineClient {
-  private engine: ATLASEngine | null = null
+  private engine: QUORUMEngine | null = null
 
   constructor(
     private readonly projectDir: string,
     private readonly outputChannel: vscode.OutputChannel
   ) {}
 
-  private getEngine(): ATLASEngine {
+  private getEngine(): QUORUMEngine {
     if (!this.engine) {
-      this.engine = new ATLASEngine({ projectDir: this.projectDir })
+      this.engine = new QUORUMEngine({ projectDir: this.projectDir })
     }
     return this.engine
   }
@@ -26,7 +26,7 @@ export class EngineClient {
   }
 
   async run(
-    command: ATLASRunOptions['command'],
+    command: QUORUMRunOptions['command'],
     opts: {
       description?: string
       auto?: boolean
@@ -38,7 +38,7 @@ export class EngineClient {
     const channel = this.outputChannel
     channel.show(true)
 
-    const options: ATLASRunOptions = {
+    const options: QUORUMRunOptions = {
       command,
       projectDir: this.projectDir,
       description: opts.description,
@@ -64,7 +64,7 @@ export class EngineClient {
         }))
 
         const picked = await vscode.window.showQuickPick(items, {
-          title: `ATLAS Checkpoint: ${checkpoint.title}`,
+          title: `QUORUM Checkpoint: ${checkpoint.title}`,
           placeHolder: checkpoint.question,
           ignoreFocusOut: true
         })

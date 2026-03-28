@@ -1,11 +1,11 @@
-# ATLAS-CLAUDE
+# QUORUM-CLAUDE
 
 **Autonomous Team for Large-scale Application Systems**
 
-ATLAS is a multi-agent AI framework that builds features end-to-end — with persistent memory, 12 coordinated agents, and 5 ways to use it.
+QUORUM is a multi-agent AI framework that builds features end-to-end — with persistent memory, 12 coordinated agents, and 5 ways to use it.
 
 ```bash
-atlas new "Build a SaaS for restaurant management with real-time orders"
+quorum new "Build a SaaS for restaurant management with real-time orders"
 ```
 
 ↓ ~40 minutes later ↓
@@ -14,14 +14,14 @@ Working application. Architecture docs. Bug registry. Cost analysis. Zero re-exp
 
 ---
 
-## 5 Ways to Use ATLAS
+## 5 Ways to Use QUORUM
 
 | Platform | How | Use Case |
 |----------|-----|----------|
-| **CLI** | `npm i -g @atlas/cli` → `atlas new "..."` | Developers — primary interface |
+| **CLI** | `npm i -g @quorum/cli` → `quorum new "..."` | Developers — primary interface |
 | **VS Code** | Install extension → sidebar panel | IDE-first workflow |
 | **MCP** | Add to Claude Desktop config | Claude Desktop tool use |
-| **Mobile** | Expo Go → atlas-console | Monitor sessions anywhere |
+| **Mobile** | Expo Go → quorum-console | Monitor sessions anywhere |
 | **Telegram** | `/login` → link account | Get notified, /stop a run |
 
 ---
@@ -31,73 +31,73 @@ Working application. Architecture docs. Bug registry. Cost analysis. Zero re-exp
 ### Core Build Pipeline
 | Command | Description |
 |---------|-------------|
-| `atlas new "desc"` | Full 12-agent pipeline — new feature from scratch |
-| `atlas enhance "desc"` | Modify existing feature (reads .atlas/ context) |
-| `atlas fast "desc"` | Skip planning for simple tasks (classifier decides) |
-| `atlas discuss "desc"` | Pre-planning Q&A — saves to `.atlas/context/discuss-{slug}.md` |
+| `quorum new "desc"` | Full 12-agent pipeline — new feature from scratch |
+| `quorum enhance "desc"` | Modify existing feature (reads .quorum/ context) |
+| `quorum fast "desc"` | Skip planning for simple tasks (classifier decides) |
+| `quorum discuss "desc"` | Pre-planning Q&A — saves to `.quorum/context/discuss-{slug}.md` |
 
 ### Session Control
 | Command | Description |
 |---------|-------------|
-| `atlas next` | Resume: what's the next task from `.atlas/task.md`? |
-| `atlas pause` | Save session state (resume later) |
-| `atlas resume` | Continue from saved pause point |
-| `atlas status` | Current phase, routing table, estimated cost |
-| `atlas session-report` | Markdown summary of this session |
+| `quorum next` | Resume: what's the next task from `.quorum/task.md`? |
+| `quorum pause` | Save session state (resume later) |
+| `quorum resume` | Continue from saved pause point |
+| `quorum status` | Current phase, routing table, estimated cost |
+| `quorum session-report` | Markdown summary of this session |
 
 ### Quality & Review
 | Command | Description |
 |---------|-------------|
-| `atlas verify` | Run E2E tests + validation suite |
-| `atlas review "target"` | Code review of a file or PR |
-| `atlas debug "symptom"` | Root cause analysis + fix |
-| `atlas ship` | Pre-ship checklist + safety checks |
+| `quorum verify` | Run E2E tests + validation suite |
+| `quorum review "target"` | Code review of a file or PR |
+| `quorum debug "symptom"` | Root cause analysis + fix |
+| `quorum ship` | Pre-ship checklist + safety checks |
 
 ### Project Memory
 | Command | Description |
 |---------|-------------|
-| `atlas init` | Initialize `.atlas/` for an existing project |
-| `atlas map [area]` | Generate `DEVGUIDE.md` — instant onboarding documentation |
-| `atlas seed "text"` | Add to the Nervous System memory |
-| `atlas backlog add "task"` | Add to structured backlog |
-| `atlas note "text"` | Quick note to `.atlas/NOTES.md` |
-| `atlas export [--output path]` | Export `.atlas/` as shareable markdown document |
+| `quorum init` | Initialize `.quorum/` for an existing project |
+| `quorum map [area]` | Generate `DEVGUIDE.md` — instant onboarding documentation |
+| `quorum seed "text"` | Add to the Nervous System memory |
+| `quorum backlog add "task"` | Add to structured backlog |
+| `quorum note "text"` | Quick note to `.quorum/NOTES.md` |
+| `quorum export [--output path]` | Export `.quorum/` as shareable markdown document |
 
 ### Configuration & Monitoring
 | Command | Description |
 |---------|-------------|
-| `atlas doctor` | Check config, providers, agent health |
-| `atlas agents` | List all agents + model assignments |
-| `atlas profile <name>` | Switch model tier: `fast`, `balanced`, `quality` |
-| `atlas key add/list/remove` | Manage encrypted API keys |
-| `atlas sync` | Re-index after manual code changes |
-| `atlas rollback [point]` | Return to previous rollback point |
+| `quorum doctor` | Check config, providers, agent health |
+| `quorum agents` | List all agents + model assignments |
+| `quorum profile <name>` | Switch model tier: `fast`, `balanced`, `quality` |
+| `quorum key add/list/remove` | Manage encrypted API keys |
+| `quorum sync` | Re-index after manual code changes |
+| `quorum rollback [point]` | Return to previous rollback point |
 
 ### CI/CD Mode
 ```bash
 # Skip all human checkpoints — for GitHub Actions, Docker builds
-atlas new "Add OAuth login" --auto
-atlas verify --auto
-atlas ship --auto
+quorum new "Add OAuth login" --auto
+quorum verify --auto
+quorum ship --auto
 ```
 
 #### GitHub Actions Example
 ```yaml
-- name: ATLAS Build
-  run: atlas new "${{ github.event.inputs.feature }}" --auto
+- name: QUORUM Build
+  run: quorum new "${{ github.event.inputs.feature }}" --auto
   env:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
 ---
 
-## Where ATLAS Beats Claude Code
+## Where QUORUM Beats Claude Code
 
-| ATLAS Advantage | Claude Code |
+| QUORUM Advantage | Claude Code |
 |----------------|-------------|
-| Persistent `.atlas/` memory — no re-explanation ever | Context resets every session |
+| Persistent `.quorum/` memory — no re-explanation ever | Context resets every session |
 | Multi-model routing (Anthropic, OpenAI, Google, Groq) | Single provider |
-| `atlas-critic` blocks all unverified claims | Agents make blind assumptions |
+| `quorum-critic` blocks all unverified claims | Agents make blind assumptions |
 | Function Registry — 99% cheaper codebase navigation | Full file reads every time |
 | Real E2E browser tests via Playwright | Text-based test suggestions |
 | Scope enforcement via `goal.md` + GoalGuardian | No scope control |
@@ -117,7 +117,7 @@ atlas ship --auto
 | Mistral | Mistral Large |
 | Ollama | Any local model |
 
-Auto-discovery: `atlas doctor` detects which keys are available and builds a routing table.
+Auto-discovery: `quorum doctor` detects which keys are available and builds a routing table.
 
 ---
 
@@ -125,33 +125,33 @@ Auto-discovery: `atlas doctor` detects which keys are available and builds a rou
 
 ```bash
 # Install CLI
-npm install -g @atlas/cli
+npm install -g @quorum/cli
 
 # Initialize a project
 cd your-project
-atlas init
+quorum init
 
 # Check what's available
-atlas doctor
+quorum doctor
 
 # Start building
-atlas new "Add user authentication with OAuth"
+quorum new "Add user authentication with OAuth"
 ```
 
 ---
 
-## Project Memory (`.atlas/`)
+## Project Memory (`.quorum/`)
 
 ```
 your-project/
-└── .atlas/
+└── .quorum/
     ├── goal.md                     ← project goal (enforced by GoalGuardian)
     ├── task.md                     ← task log
-    ├── DEVGUIDE.md                 ← auto-generated by atlas map
+    ├── DEVGUIDE.md                 ← auto-generated by quorum map
     ├── BUGS.md                     ← bug registry
     ├── NOTES.md                    ← quick notes
     ├── context/
-    │   ├── discuss-{slug}.md       ← discuss output (auto-loaded by atlas new)
+    │   ├── discuss-{slug}.md       ← discuss output (auto-loaded by quorum new)
     │   └── codebase-map.md
     └── nervous-system/
         ├── decisions.json
@@ -179,17 +179,17 @@ docker-compose up -d
 ## Monorepo Structure
 
 ```
-ATLAS-CLAUDE/
+QUORUM-CLAUDE/
 ├── packages/
 │   ├── core/          ← ATLASEngine, memory, providers, agent runner
 │   ├── cli/           ← 25+ CLI commands
 │   ├── mcp/           ← 14 MCP tools for Claude Desktop
 │   └── vscode/        ← VS Code extension (sidebar, panel, status bar)
 ├── apps/
-│   ├── atlas-server/  ← Express + Socket.IO + SQLite backend
+│   ├── quorum-server/  ← Express + Socket.IO + SQLite backend
 │   ├── telegram-bot/  ← Standalone Telegram bot
-│   ├── atlas-console/ ← React Native mobile app (Expo)
-│   └── atlas-web/     ← React web dashboard (Vite)
+│   ├── quorum-console/ ← React Native mobile app (Expo)
+│   └── quorum-web/     ← React web dashboard (Vite)
 ├── agents/            ← 12 agent definitions
 ├── commands/          ← Legacy slash commands
 ├── docker-compose.yml

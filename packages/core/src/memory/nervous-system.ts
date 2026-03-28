@@ -12,22 +12,22 @@ import type {
 } from '../types.js'
 
 export class NervousSystem {
-  private atlasDir: string
+  private quorumDir: string
   private nsDir: string // nervous-system dir
 
   constructor(private projectDir: string) {
-    this.atlasDir = path.join(projectDir, '.atlas')
-    this.nsDir = path.join(this.atlasDir, 'nervous-system')
+    this.quorumDir = path.join(projectDir, '.quorum')
+    this.nsDir = path.join(this.quorumDir, 'nervous-system')
   }
 
   async initialize(): Promise<void> {
     const dirs = [
-      this.atlasDir,
+      this.quorumDir,
       this.nsDir,
-      path.join(this.atlasDir, 'index'),
-      path.join(this.atlasDir, 'context'),
-      path.join(this.atlasDir, 'rollback_points'),
-      path.join(this.atlasDir, 'context', 'sessions')
+      path.join(this.quorumDir, 'index'),
+      path.join(this.quorumDir, 'context'),
+      path.join(this.quorumDir, 'rollback_points'),
+      path.join(this.quorumDir, 'context', 'sessions')
     ]
     for (const dir of dirs) {
       await mkdir(dir, { recursive: true })
@@ -54,27 +54,27 @@ export class NervousSystem {
     }
 
     // Initialize plan.md
-    const planPath = path.join(this.atlasDir, 'plan.md')
+    const planPath = path.join(this.quorumDir, 'plan.md')
     if (!existsSync(planPath)) {
       await writeFile(planPath, this.initialPlanTemplate(), 'utf-8')
     }
 
     // Initialize history_plan.md
-    const historyPath = path.join(this.atlasDir, 'history_plan.md')
+    const historyPath = path.join(this.quorumDir, 'history_plan.md')
     if (!existsSync(historyPath)) {
-      await writeFile(historyPath, '# ATLAS Plan History\n\n', 'utf-8')
+      await writeFile(historyPath, '# QUORUM Plan History\n\n', 'utf-8')
     }
 
     // Initialize BUGS.md
-    const bugsPath = path.join(this.atlasDir, 'BUGS.md')
+    const bugsPath = path.join(this.quorumDir, 'BUGS.md')
     if (!existsSync(bugsPath)) {
-      await writeFile(bugsPath, '# BUGS\n\nMaintained by: atlas-testing\n\n', 'utf-8')
+      await writeFile(bugsPath, '# BUGS\n\nMaintained by: quorum-esting\n\n', 'utf-8')
     }
 
     // Initialize DEVGUIDE.md
-    const devguidePath = path.join(this.atlasDir, 'DEVGUIDE.md')
+    const devguidePath = path.join(this.quorumDir, 'DEVGUIDE.md')
     if (!existsSync(devguidePath)) {
-      await writeFile(devguidePath, '# Developer Guide\n\nMaintained by: atlas-nervous-system\n\n', 'utf-8')
+      await writeFile(devguidePath, '# Developer Guide\n\nMaintained by: quorum-ervous-system\n\n', 'utf-8')
     }
   }
 
@@ -169,22 +169,22 @@ export class NervousSystem {
   // ── Plan ─────────────────────────────────────────────────────────────────────
 
   async readPlan(): Promise<string> {
-    const p = path.join(this.atlasDir, 'plan.md')
+    const p = path.join(this.quorumDir, 'plan.md')
     if (!existsSync(p)) return ''
     return readFile(p, 'utf-8')
   }
 
   async updatePlan(content: string): Promise<void> {
-    await writeFile(path.join(this.atlasDir, 'plan.md'), content, 'utf-8')
+    await writeFile(path.join(this.quorumDir, 'plan.md'), content, 'utf-8')
   }
 
   // Archive current plan with a version stamp — ALWAYS APPENDS, never replaces
   async archivePlan(sessionId: string, reason: string, modelsUsed: string[]): Promise<void> {
     const current = await this.readPlan()
-    const historyPath = path.join(this.atlasDir, 'history_plan.md')
+    const historyPath = path.join(this.quorumDir, 'history_plan.md')
     const existing = existsSync(historyPath)
       ? await readFile(historyPath, 'utf-8')
-      : '# ATLAS Plan History\n\n'
+      : '# QUORUM Plan History\n\n'
 
     const versionCount = (existing.match(/## plan\.md v\d+/g) ?? []).length + 1
     const entry = `
@@ -202,7 +202,7 @@ ${current}
   // ── Interrupt Queue ──────────────────────────────────────────────────────────
 
   async readInterruptQueue(): Promise<Array<{ id: string; content: string; status: string }>> {
-    const p = path.join(this.atlasDir, 'interrupt-queue.json')
+    const p = path.join(this.quorumDir, 'interrupt-queue.json')
     if (!existsSync(p)) return []
     try {
       const raw = JSON.parse(await readFile(p, 'utf-8')) as {
@@ -214,7 +214,7 @@ ${current}
 
   async clearInterruptQueue(): Promise<void> {
     await writeFile(
-      path.join(this.atlasDir, 'interrupt-queue.json'),
+      path.join(this.quorumDir, 'interrupt-queue.json'),
       JSON.stringify({ queue: [] }, null, 2),
       'utf-8'
     )
@@ -260,7 +260,7 @@ ${current}
   // ── Private Helpers ──────────────────────────────────────────────────────────
 
   private async appendToBugsFile(bug: Bug): Promise<void> {
-    const p = path.join(this.atlasDir, 'BUGS.md')
+    const p = path.join(this.quorumDir, 'BUGS.md')
     const existing = existsSync(p) ? await readFile(p, 'utf-8') : '# BUGS\n\n'
     const entry = `
 ## ${bug.id}
@@ -290,7 +290,7 @@ ${current}
   }
 
   private initialPlanTemplate(): string {
-    return `# ATLAS Execution Plan
+    return `# QUORUM Execution Plan
 Project: (pending)
 Session: (new)
 Last updated: ${new Date().toISOString()}
@@ -305,7 +305,7 @@ Foundation Mode — seeding project memory
 
 ## Current Steps
 - [ ] Classify project complexity
-- [ ] Seed .atlas/ with stack and decisions
+- [ ] Seed .quorum/ with stack and decisions
 
 ## Upcoming Steps
 - [ ] Phase 1: Backend Architecture

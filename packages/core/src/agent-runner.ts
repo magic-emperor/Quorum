@@ -50,7 +50,7 @@ export class AgentRunner {
     if (!routing) {
       throw new Error(
         `No routing found for agent "${agentName}". ` +
-        `Check auto_provider_selection in atlas.config.json.`
+        `Check auto_provider_selection in quorum.config.json.`
       )
     }
 
@@ -118,7 +118,17 @@ export class AgentRunner {
       const { model, provider } = providersToTry[i]!
       try {
         const p = buildProvider(model, provider)
-        return await p.call(messages, systemPrompt, maxTokens)
+        const res = await p.call(messages, systemPrompt, maxTokens)
+
+        // If we succeeded but it was a fallback (not the primary),
+        // permanently update the routing so we don't retry the dead primary on next turn.
+        if (i > 0) {
+          routing.provider = provider
+          routing.model = model
+          routing.fallback_chain = providersToTry.slice(i + 1)
+        }
+
+        return res
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
         const status = (err as { status?: number }).status
@@ -133,16 +143,14 @@ export class AgentRunner {
         }
 
         if (isHardError && !hasMore) {
-          // All providers exhausted — throw a clear ATLAS-formatted error
           failures.push(`${provider}: ${reason}`)
           const summary = failures.join(', ')
           throw new Error(
             `All providers failed for [${agentName}] — ${summary}.\n` +
-            `Check your API keys and credit balances in atlas.config.json`
+            `Check your API keys and credit balances in quorum.config.json`
           )
         }
 
-        // Non-retryable error (e.g. network, parsing) — rethrow as-is
         throw err
       }
     }

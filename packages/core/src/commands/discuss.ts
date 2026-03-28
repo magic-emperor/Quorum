@@ -1,6 +1,6 @@
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
-import type { ATLASRunOptions, RoutingTable, DiscussResult } from '../types.js'
+import type { QUORUMRunOptions, RoutingTable, DiscussResult } from '../types.js'
 import { AgentRunner } from '../agent-runner.js'
 import { NervousSystem } from '../memory/nervous-system.js'
 import { GoalGuardian } from '../memory/goal-guardian.js'
@@ -8,7 +8,7 @@ import { TaskManager } from '../memory/task-manager.js'
 
 /** Convert a feature description to a stable slug for file naming.
  *  e.g. "Add OAuth login" → "add-oauth-login"
- *  This allows atlas new / atlas enhance to auto-find the discuss context.
+ *  This allows quorum new / quorum enhance to auto-find the discuss context.
  */
 function toSlug(text: string): string {
   return text
@@ -24,7 +24,7 @@ export async function runDiscuss(
   projectDir: string,
   agentsDir: string,
   routingTable: RoutingTable,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<DiscussResult> {
   const { onProgress, onAgentOutput } = options
 
@@ -50,7 +50,7 @@ export async function runDiscuss(
     .join('\n')
 
   const response = await agentRunner.run({
-    agentName: 'atlas-planner',
+    agentName: 'quorum-planner',
     userMessage: `DISCUSS MODE — do not create a plan yet.
 
 Feature to discuss: ${description}
@@ -84,10 +84,10 @@ QUESTIONS (answer these before planning):
     onProgress
   })
 
-  onAgentOutput?.('atlas-planner (discuss)', response.content)
+  onAgentOutput?.('quorum-planner (discuss)', response.content)
 
-  // Persist to slug-named file so atlas new / atlas enhance can auto-inject context
-  const contextDir = path.join(projectDir, '.atlas', 'context')
+  // Persist to slug-named file so quorum new / quorum enhance can auto-inject context
+  const contextDir = path.join(projectDir, '.quorum', 'context')
   await mkdir(contextDir, { recursive: true })
 
   const outputFile = path.join(contextDir, `discuss-${slug}.md`)
@@ -103,7 +103,7 @@ ${description}
 ${response.content}
 
 ## Human Answers
-(fill these in, then run: atlas new "${description}")
+(fill these in, then run: quorum new "${description}")
 
 ---
 `
@@ -116,10 +116,10 @@ ${response.content}
     .map(l => l.replace(/^\d+\.\s*/, '').split('—')[0]?.trim() ?? l)
 
   onProgress?.('')
-  onProgress?.(`✓ Discussion saved to: .atlas/context/discuss-${slug}.md`)
+  onProgress?.(`✓ Discussion saved to: .quorum/context/discuss-${slug}.md`)
   onProgress?.('  Fill in your answers in that file, then run:')
-  onProgress?.(`  atlas new "${description}"`)
-  onProgress?.('  ATLAS will automatically load your answers before planning.')
+  onProgress?.(`  quorum new "${description}"`)
+  onProgress?.('  QUORUM will automatically load your answers before planning.')
 
   return {
     feature: description,

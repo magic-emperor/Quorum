@@ -3,18 +3,18 @@ import { existsSync } from 'fs'
 import path from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import type { DoctorReport, DoctorCheck, ATLASRunOptions } from '../types.js'
+import type { DoctorReport, DoctorCheck, QUORUMRunOptions } from '../types.js'
 
 const execAsync = promisify(exec)
 
 export async function runDoctor(
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<DoctorReport> {
   const { onProgress } = options
   const repair = options.extra?.repair === 'true'
 
-  onProgress?.('Running ATLAS health check...')
+  onProgress?.('Running QUORUM health check...')
   onProgress?.('')
 
   const checks: DoctorCheck[] = []
@@ -43,9 +43,9 @@ export async function runDoctor(
       name: 'API keys',
       status: 'fail',
       message: 'No API keys found — at least one provider key is required',
-      action: 'Run: atlas key add GOOGLE_AI_API_KEY=your-key  (free tier available)\n    Or: atlas key add GROQ_API_KEY=your-key  (completely free at console.groq.com)'
+      action: 'Run: quorum key add GOOGLE_AI_API_KEY=your-key  (free tier available)\n    Or: quorum key add GROQ_API_KEY=your-key  (completely free at console.groq.com)'
     })
-    requiresManual.push('Add at least one API key via atlas key add')
+    requiresManual.push('Add at least one API key via quorum key add')
   }
 
   // ─── Check 2: Playwright ────────────────────────────────────────────────────
@@ -99,23 +99,23 @@ export async function runDoctor(
     checks.push({ name: 'Node.js version', status: 'fail', message: 'Node.js not found', action: 'Install Node.js from nodejs.org' })
   }
 
-  // ─── Check 4: .atlas/ folder ────────────────────────────────────────────────
+  // ─── Check 4: .quorum/ folder ────────────────────────────────────────────────
 
-  const atlasDir = path.join(projectDir, '.atlas')
+  const quorumDir = path.join(projectDir, '.quorum')
 
-  if (!existsSync(atlasDir)) {
+  if (!existsSync(quorumDir)) {
     checks.push({
-      name: '.atlas/ folder',
+      name: '.quorum/ folder',
       status: 'warn',
-      message: '.atlas/ not found in this project — run atlas init to create it',
+      message: '.quorum/ not found in this project — run quorum init to create it',
     })
   } else {
-    checks.push({ name: '.atlas/ folder', status: 'pass', message: '.atlas/ exists' })
+    checks.push({ name: '.quorum/ folder', status: 'pass', message: '.quorum/ exists' })
 
     // ─── Check 5: task-index.json integrity ───────────────────────────────────
 
-    const taskIndexPath = path.join(atlasDir, 'task-index.json')
-    const taskMdPath = path.join(atlasDir, 'task.md')
+    const taskIndexPath = path.join(quorumDir, 'task-index.json')
+    const taskMdPath = path.join(quorumDir, 'task.md')
 
     if (existsSync(taskIndexPath) && existsSync(taskMdPath)) {
       try {
@@ -132,7 +132,7 @@ export async function runDoctor(
             name: 'task-index.json sync',
             status: 'warn',
             message: `Mismatch: ${mdCount} tasks in task.md but ${indexCount} in index`,
-            fix: 'atlas sync --tasks to rebuild task index'
+            fix: 'quorum sync --tasks to rebuild task index'
           })
 
           if (repair) {
@@ -149,7 +149,7 @@ export async function runDoctor(
           name: 'task-index.json sync',
           status: 'fail',
           message: 'task-index.json is corrupted or invalid JSON',
-          fix: 'atlas sync to rebuild from scratch'
+          fix: 'quorum sync to rebuild from scratch'
         })
         if (repair) {
           const emptyIndex = {
@@ -158,7 +158,7 @@ export async function runDoctor(
             tasks: [], keywords_index: {}, files_index: {}, next_task_number: 1
           }
           await writeFile(taskIndexPath, JSON.stringify(emptyIndex, null, 2), 'utf-8')
-          repaired.push('task-index.json rebuilt (empty — run atlas sync to repopulate)')
+          repaired.push('task-index.json rebuilt (empty — run quorum sync to repopulate)')
         }
       }
     } else {
@@ -167,20 +167,20 @@ export async function runDoctor(
 
     // ─── Check 6: goal.md ────────────────────────────────────────────────────
 
-    if (existsSync(path.join(atlasDir, 'goal.md'))) {
+    if (existsSync(path.join(quorumDir, 'goal.md'))) {
       checks.push({ name: 'goal.md', status: 'pass', message: 'Project goal defined — scope enforcement active' })
     } else {
       checks.push({
         name: 'goal.md',
         status: 'warn',
         message: 'No goal.md — AI has no scope anchor',
-        action: 'Run atlas init or create .atlas/goal.md manually'
+        action: 'Run quorum init or create .quorum/goal.md manually'
       })
     }
 
     // ─── Check 7: decisions.json readable ────────────────────────────────────
 
-    const decisionsPath = path.join(atlasDir, 'nervous-system', 'decisions.json')
+    const decisionsPath = path.join(quorumDir, 'nervous-system', 'decisions.json')
     if (existsSync(decisionsPath)) {
       try {
         const raw = await readFile(decisionsPath, 'utf-8')
@@ -192,7 +192,7 @@ export async function runDoctor(
           name: 'decisions.json',
           status: 'fail',
           message: 'decisions.json corrupted',
-          fix: 'Delete and let atlas recreate it'
+          fix: 'Delete and let quorum recreate it'
         })
         if (repair) {
           await writeFile(decisionsPath, '[]', 'utf-8')
@@ -203,7 +203,7 @@ export async function runDoctor(
 
     // ─── Check 8: function-registry.json readable ─────────────────────────────
 
-    const registryPath = path.join(atlasDir, 'nervous-system', 'function-registry.json')
+    const registryPath = path.join(quorumDir, 'nervous-system', 'function-registry.json')
     if (existsSync(registryPath)) {
       try {
         const raw = await readFile(registryPath, 'utf-8')
@@ -214,7 +214,7 @@ export async function runDoctor(
         checks.push({
           name: 'function-registry.json',
           status: 'warn',
-          message: 'function-registry.json unreadable — run atlas sync to rebuild',
+          message: 'function-registry.json unreadable — run quorum sync to rebuild',
         })
         if (repair) {
           await writeFile(registryPath, '[]', 'utf-8')
@@ -224,27 +224,27 @@ export async function runDoctor(
     }
   }
 
-  // ─── Check 9: atlas.config.json ──────────────────────────────────────────────
+  // ─── Check 9: quorum.config.json ──────────────────────────────────────────────
 
-  const configPath = path.join(projectDir, 'atlas.config.json')
+  const configPath = path.join(projectDir, 'quorum.config.json')
   if (existsSync(configPath)) {
     try {
       const raw = await readFile(configPath, 'utf-8')
       JSON.parse(raw)
-      checks.push({ name: 'atlas.config.json', status: 'pass', message: 'Config file found and valid JSON' })
+      checks.push({ name: 'quorum.config.json', status: 'pass', message: 'Config file found and valid JSON' })
     } catch {
       checks.push({
-        name: 'atlas.config.json',
+        name: 'quorum.config.json',
         status: 'fail',
-        message: 'atlas.config.json is invalid JSON — fix syntax errors',
+        message: 'quorum.config.json is invalid JSON — fix syntax errors',
       })
-      requiresManual.push('Fix JSON syntax in atlas.config.json')
+      requiresManual.push('Fix JSON syntax in quorum.config.json')
     }
   } else {
     checks.push({
-      name: 'atlas.config.json',
+      name: 'quorum.config.json',
       status: 'warn',
-      message: 'No atlas.config.json — using defaults. Run atlas key add to configure.',
+      message: 'No quorum.config.json — using defaults. Run quorum key add to configure.',
     })
   }
 
@@ -269,7 +269,7 @@ export async function runDoctor(
   const overall = failures > 0 ? 'broken' : warnings > 2 ? 'degraded' : 'healthy'
   const report: DoctorReport = { overall, checks, repaired, requires_manual_fix: requiresManual }
 
-  onProgress?.('ATLAS DOCTOR REPORT')
+  onProgress?.('QUORUM DOCTOR REPORT')
   onProgress?.('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
   for (const check of checks) {
@@ -296,7 +296,7 @@ export async function runDoctor(
   onProgress?.('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
   if (failures > 0 && !repair) {
-    onProgress?.('Run atlas doctor --repair to auto-fix repairable issues.')
+    onProgress?.('Run quorum doctor --repair to auto-fix repairable issues.')
   }
 
   return report

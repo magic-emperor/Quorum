@@ -1,7 +1,7 @@
 import { writeFile, mkdir, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import type { ATLASRunOptions, ProjectGoal } from '../types.js'
+import type { QUORUMRunOptions, ProjectGoal } from '../types.js'
 import { NervousSystem } from '../memory/nervous-system.js'
 import { TaskManager } from '../memory/task-manager.js'
 import { PlanManager } from '../memory/plan-manager.js'
@@ -9,17 +9,17 @@ import { GoalGuardian } from '../memory/goal-guardian.js'
 
 export async function runInit(
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<void> {
   const { onProgress, onCheckpoint, auto } = options
 
-  onProgress?.('Initializing ATLAS project memory...')
+  onProgress?.('Initializing QUORUM project memory...')
 
-  const atlasDir = path.join(projectDir, '.atlas')
-  if (existsSync(path.join(atlasDir, 'nervous-system', 'decisions.json'))) {
-    onProgress?.('.atlas/ already exists in this project.')
-    onProgress?.('To re-initialize: delete .atlas/ first.')
-    onProgress?.('To update: use atlas sync')
+  const quorumDir = path.join(projectDir, '.quorum')
+  if (existsSync(path.join(quorumDir, 'nervous-system', 'decisions.json'))) {
+    onProgress?.('.quorum/ already exists in this project.')
+    onProgress?.('To re-initialize: delete .quorum/ first.')
+    onProgress?.('To update: use quorum sync')
     return
   }
 
@@ -32,7 +32,7 @@ export async function runInit(
   await taskManager.initialize()
   await planManager.initialize()
 
-  onProgress?.('.atlas/ folder structure created.')
+  onProgress?.('.quorum/ folder structure created.')
 
   let goalText = options.description ?? ''
 
@@ -40,7 +40,7 @@ export async function runInit(
     const checkpoint = {
       type: 'BLOCKER' as const,
       title: 'Define Your Project Goal',
-      completed: ['.atlas/ folder created', 'Memory systems initialized'],
+      completed: ['.quorum/ folder created', 'Memory systems initialized'],
       question: 'What are you building? Describe it in 2-3 sentences. This becomes goal.md — the anchor that prevents AI from going off-track.',
       options: [
         { label: 'Type your description', tradeoff: 'Creates goal.md immediately' },
@@ -78,10 +78,10 @@ export async function runInit(
   await ensureGitignore(projectDir, onProgress)
 
   onProgress?.('')
-  onProgress?.('ATLAS initialized. Next steps:')
-  onProgress?.('  1. Edit .atlas/goal.md — define what is and is NOT in scope')
-  onProgress?.('  2. Run: atlas new "describe your first feature"')
-  onProgress?.('  3. Or: atlas map — let agents understand your existing codebase first')
+  onProgress?.('QUORUM initialized. Next steps:')
+  onProgress?.('  1. Edit .quorum/goal.md — define what is and is NOT in scope')
+  onProgress?.('  2. Run: quorum new "describe your first feature"')
+  onProgress?.('  3. Or: quorum map — let agents understand your existing codebase first')
 }
 
 async function detectAndSeedStack(
@@ -132,12 +132,12 @@ async function ensureGitignore(
   onProgress?: (msg: string) => void
 ): Promise<void> {
   const gitignorePath = path.join(projectDir, '.gitignore')
-  const atlasIgnoreLines = [
+  const quorumIgnoreLines = [
     '',
-    '# ATLAS — do not commit screenshots (large files)',
-    '.atlas/context/screenshots/',
-    '.atlas/context/budget-log.json',
-    '.atlas/rollback_points/',
+    '# QUORUM — do not commit screenshots (large files)',
+    '.quorum/context/screenshots/',
+    '.quorum/context/budget-log.json',
+    '.quorum/rollback_points/',
   ]
 
   try {
@@ -145,8 +145,8 @@ async function ensureGitignore(
       ? await readFile(gitignorePath, 'utf-8')
       : ''
 
-    if (!existing.includes('.atlas/context/screenshots')) {
-      await writeFile(gitignorePath, existing + atlasIgnoreLines.join('\n') + '\n', 'utf-8')
+    if (!existing.includes('.quorum/context/screenshots')) {
+      await writeFile(gitignorePath, existing + quorumIgnoreLines.join('\n') + '\n', 'utf-8')
       onProgress?.('.gitignore updated — screenshots excluded from git.')
     }
   } catch {

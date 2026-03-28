@@ -1,6 +1,6 @@
 import { existsSync } from 'fs'
 import path from 'path'
-import type { ATLASRunOptions } from '../types.js'
+import type { QUORUMRunOptions } from '../types.js'
 import { TaskManager } from '../memory/task-manager.js'
 import { PlanManager } from '../memory/plan-manager.js'
 import { GoalGuardian } from '../memory/goal-guardian.js'
@@ -15,28 +15,28 @@ export interface NextRecommendation {
 
 export async function runNext(
   projectDir: string,
-  options: ATLASRunOptions
+  options: QUORUMRunOptions
 ): Promise<NextRecommendation> {
   const { onProgress } = options
-  const atlasDir = path.join(projectDir, '.atlas')
+  const quorumDir = path.join(projectDir, '.quorum')
 
   onProgress?.('Analyzing project state...')
 
-  if (!existsSync(path.join(atlasDir, 'nervous-system', 'decisions.json'))) {
+  if (!existsSync(path.join(quorumDir, 'nervous-system', 'decisions.json'))) {
     const rec: NextRecommendation = {
-      action: 'Initialize ATLAS',
-      command: 'atlas init',
-      reason: 'No .atlas/ folder found — project not initialized',
+      action: 'Initialize QUORUM',
+      command: 'quorum init',
+      reason: 'No .quorum/ folder found — project not initialized',
       urgency: 'do_now'
     }
     printRecommendation(rec, onProgress)
     return rec
   }
 
-  if (!existsSync(path.join(atlasDir, 'goal.md'))) {
+  if (!existsSync(path.join(quorumDir, 'goal.md'))) {
     const rec: NextRecommendation = {
       action: 'Define project goal',
-      command: 'atlas init',
+      command: 'quorum init',
       reason: 'No goal.md found — AI has no scope anchor and may go off-track',
       urgency: 'do_now'
     }
@@ -58,7 +58,7 @@ export async function runNext(
   if (blocked.length > 0) {
     const rec: NextRecommendation = {
       action: `Unblock ${blocked.length} task(s)`,
-      command: `atlas tasks list --status blocked`,
+      command: `quorum tasks list --status blocked`,
       reason: `${blocked[0]?.title} and ${blocked.length - 1} others are blocked`,
       urgency: 'do_now'
     }
@@ -66,11 +66,11 @@ export async function runNext(
     return rec
   }
 
-  const handoffPath = path.join(atlasDir, 'HANDOFF.md')
+  const handoffPath = path.join(quorumDir, 'HANDOFF.md')
   if (existsSync(handoffPath)) {
     const rec: NextRecommendation = {
       action: 'Resume paused session',
-      command: 'atlas resume',
+      command: 'quorum resume',
       reason: 'Found a paused session — pick up where you left off',
       urgency: 'do_now'
     }
@@ -83,7 +83,7 @@ export async function runNext(
     const task = inProgress[0]!
     const rec: NextRecommendation = {
       action: `Continue: ${task.title}`,
-      command: `atlas enhance "continue ${task.title}"`,
+      command: `quorum enhance "continue ${task.title}"`,
       reason: `${task.id} is in progress — finish it before starting new work`,
       urgency: 'do_now'
     }
@@ -99,7 +99,7 @@ export async function runNext(
     if (todoTasks.length > 0) {
       const rec: NextRecommendation = {
         action: `Build next task: ${todoTasks[0]!.title}`,
-        command: `atlas new "${todoTasks[0]!.title}"`,
+        command: `quorum new "${todoTasks[0]!.title}"`,
         reason: `Phase "${currentPhase.name}" has ${todoTasks.length} tasks remaining`,
         urgency: 'do_now'
       }
@@ -109,7 +109,7 @@ export async function runNext(
 
     const rec: NextRecommendation = {
       action: `Verify phase "${currentPhase.name}"`,
-      command: 'atlas verify',
+      command: 'quorum verify',
       reason: `All tasks in "${currentPhase.name}" appear complete — run UAT verification`,
       urgency: 'suggested'
     }
@@ -121,7 +121,7 @@ export async function runNext(
   if (allComplete && planIndex.phases.length > 0) {
     const rec: NextRecommendation = {
       action: 'Ship — create pull request',
-      command: 'atlas ship',
+      command: 'quorum ship',
       reason: 'All planned phases complete — ready to create PR',
       urgency: 'suggested'
     }
@@ -132,7 +132,7 @@ export async function runNext(
   if (planIndex.phases.length === 0) {
     const rec: NextRecommendation = {
       action: 'Start building',
-      command: 'atlas new "describe what you want to build"',
+      command: 'quorum new "describe what you want to build"',
       reason: 'No implementation plan yet — start with a new feature',
       urgency: 'suggested'
     }
@@ -144,7 +144,7 @@ export async function runNext(
   if (openQ.length > 0) {
     const rec: NextRecommendation = {
       action: 'Resolve blocking questions',
-      command: 'atlas status --decisions',
+      command: 'quorum status --decisions',
       reason: `${openQ.length} blocking question(s) need resolution`,
       urgency: 'suggested'
     }
@@ -154,7 +154,7 @@ export async function runNext(
 
   const rec: NextRecommendation = {
     action: 'Check project status',
-    command: 'atlas status',
+    command: 'quorum status',
     reason: 'Project state unclear — review status for next steps',
     urgency: 'optional'
   }
@@ -171,7 +171,7 @@ function printRecommendation(
     : '·'
 
   onProgress?.('')
-  onProgress?.(`ATLAS NEXT`)
+  onProgress?.(`QUORUM NEXT`)
   onProgress?.(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
   onProgress?.(`${urgencyIcon} ${rec.action}`)
   onProgress?.(`  Why: ${rec.reason}`)

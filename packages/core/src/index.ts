@@ -1,5 +1,5 @@
-// Public API for @atlas/core
-export { ATLASEngine } from './engine.js'
+// Public API for @quorum/core
+export { QUORUMEngine } from './engine.js'
 export { NervousSystem } from './memory/nervous-system.js'
 export { FunctionRegistry } from './memory/function-registry.js'
 export { AgentRunner } from './agent-runner.js'
@@ -17,8 +17,8 @@ export {
 } from './commands/index.js'
 
 export type {
-  ATLASConfig,
-  ATLASRunOptions,
+  QUORUMConfig,
+  QUORUMRunOptions,
   RoutingTable,
   ResolvedModel,
   AgentMessage,
