@@ -1,4 +1,4 @@
-# QUORUM-CLAUDE
+# QUORUM
 
 **Autonomous Team for Large-scale Application Systems**
 
