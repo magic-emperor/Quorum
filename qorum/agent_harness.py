@@ -30,7 +30,7 @@ from qorum.providers.errors import ProviderRateLimit, ProviderServerError
 from qorum.tools.base import ToolContext, ToolResult
 from qorum.tools.events import ToolEvent
 from qorum.tools.policy import ToolPolicy
-from qorum.tools.registry import ToolRegistry
+from qorum.tools.registry import ToolRegistry, build_registry
 
 log = get_logger(__name__)
 
@@ -117,6 +117,21 @@ async def run_agent(
     provider, model = provider_registry.provider_for(agent.model_role)
     caps = provider.capabilities(model)
 
+    # Tool gap-filling: inject Qorum-native web_search when provider lacks it.
+    # Providers with native web search (Claude, Gemini) handle it themselves;
+    # providers without it (Groq, DeepSeek, Mistral, Moonshot) get our tool injected.
+    effective_registry = tool_registry
+    if not caps.native_web_search and "web_search" not in tool_registry:
+        from qorum.tools.registry import build_registry as _build_registry
+        from qorum.tools.search import WebSearchTool
+        effective_registry = ToolRegistry()
+        for name in tool_registry.names():
+            t = tool_registry.get(name)
+            if t is not None:
+                effective_registry.register(t)
+        effective_registry.register(WebSearchTool())
+        log.debug("harness.tool_gap_fill", injected="web_search", provider=provider.name)
+
     log.info(
         "harness.start",
         agent=agent.name,
@@ -124,11 +139,14 @@ async def run_agent(
         provider=provider.name,
         model=model,
         mode="native" if caps.native_tool_use else "structured",
+        native_web_search=caps.native_web_search,
+        native_thinking=caps.native_thinking,
     )
 
     if caps.native_tool_use:
-        return await _run_native(agent, task, tool_registry, ctx, provider, model, run_id, quorum_dir)
-    return await _run_structured(agent, task, tool_registry, ctx, provider, model, run_id, quorum_dir)
+        return await _run_native(agent, task, effective_registry, ctx, provider, model, run_id, quorum_dir)
+    # Providers without native tool use get the structured ReAct loop (acts as thinking proxy)
+    return await _run_structured(agent, task, effective_registry, ctx, provider, model, run_id, quorum_dir)
 
 
 # ── Native tool-use loop ──────────────────────────────────────────────────────

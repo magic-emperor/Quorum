@@ -2,9 +2,14 @@
 Qorum — Application Entry Point
 
 Usage:
-    python main.py                  # Start all configured bots
-    python main.py --platform slack # Start Slack bot only
-    python main.py --test-url <url> # Test URL detection + context fetch (no bot)
+    qorum                           # Start all configured bots
+    qorum --teams                   # Start Teams only
+    qorum --slack                   # Start Slack only
+    qorum --telegram --discord      # Start two platforms at once
+    qorum bot --platform teams      # Long-form alias (same result)
+    qorum serve                     # Start visibility server + web dashboard
+    qorum watch --tool jira --project KEY
+    qorum test-url <url>
 """
 from __future__ import annotations
 
@@ -58,7 +63,14 @@ def parse_args() -> argparse.Namespace:
     url_p.add_argument("url", help="Full ticket URL to test")
     url_p.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default=None)
 
-    # ── Legacy top-level flags (backward compat with old entry point) ─────────
+    # ── Short-form platform flags: qorum --teams, qorum --slack --discord ───────
+    parser.add_argument("--teams",     action="store_true", help="Start Teams bot")
+    parser.add_argument("--slack",     action="store_true", help="Start Slack bot")
+    parser.add_argument("--discord",   action="store_true", help="Start Discord bot")
+    parser.add_argument("--telegram",  action="store_true", help="Start Telegram bot")
+    parser.add_argument("--whatsapp",  action="store_true", help="Start WhatsApp bot")
+
+    # ── Legacy top-level flags (backward compat) ──────────────────────────────
     parser.add_argument(
         "--platform",
         choices=["slack", "discord", "telegram", "all"],
@@ -118,15 +130,24 @@ async def test_url(url: str) -> None:
 
 
 def _build_bots(platform: str, orchestrator) -> list:
-    """Instantiate all configured bot adapters for the requested platform(s)."""
+    """Instantiate configured bot adapters. platform can be a single name,
+    'all', or a comma-separated list e.g. 'teams,discord'."""
     from qorum.config import settings
     from qorum.bot.slack_adapter import SlackAdapter
     from qorum.bot.discord_adapter import DiscordAdapter
     from qorum.bot.telegram_adapter import TelegramAdapter
 
-    want_slack    = platform in ("slack", "all")
-    want_discord  = platform in ("discord", "all")
-    want_telegram = platform in ("telegram", "all")
+    # Normalise: comma-separated list → membership check
+    selected = {p.strip() for p in platform.split(",")} if "," in platform else None
+
+    def _want(name: str) -> bool:
+        if selected:
+            return name in selected
+        return platform in (name, "all")
+
+    want_slack    = _want("slack")
+    want_discord  = _want("discord")
+    want_telegram = _want("telegram")
 
     bots = []
 
@@ -148,7 +169,7 @@ def _build_bots(platform: str, orchestrator) -> list:
     elif want_telegram:
         log.warning("qorum.bot.skipped", platform="telegram", reason="TELEGRAM_BOT_TOKEN not set")
 
-    want_teams = platform in ("teams", "all")
+    want_teams = _want("teams")
     if want_teams and settings.qorum_teams_app_id and settings.qorum_teams_app_password:
         from qorum.bot.teams_adapter import TeamsAdapter as _TeamsAdapter
         teams_bot = _TeamsAdapter(settings, orchestrator)
@@ -164,7 +185,7 @@ def _build_bots(platform: str, orchestrator) -> list:
         log.warning("qorum.bot.skipped", platform="teams",
                     reason="QORUM_TEAMS_APP_ID or QORUM_TEAMS_APP_PASSWORD not set")
 
-    want_whatsapp = platform in ("whatsapp", "all")
+    want_whatsapp = _want("whatsapp")
     if want_whatsapp and settings.qorum_whatsapp_token and settings.qorum_whatsapp_phone_id:
         from qorum.bot.whatsapp_adapter import WhatsAppAdapter as _WAAdapter
         wa_bot = _WAAdapter(settings, orchestrator)
@@ -254,10 +275,17 @@ def main() -> None:
         asyncio.run(test_url(args.url))
     elif args.test_url:          # legacy flag
         asyncio.run(test_url(args.test_url))
-    elif args.platform:          # legacy flag
+    elif args.platform:          # legacy --platform flag
         asyncio.run(start_bots(args.platform))
+    elif any([args.teams, args.slack, args.discord, args.telegram, args.whatsapp]):
+        # Short flags: qorum --teams, qorum --slack --discord, etc.
+        selected = [p for p, flag in [
+            ("teams", args.teams), ("slack", args.slack), ("discord", args.discord),
+            ("telegram", args.telegram), ("whatsapp", args.whatsapp),
+        ] if flag]
+        asyncio.run(start_bots(",".join(selected)))
     else:
-        # Default: start all bots
+        # Default: start all configured bots
         asyncio.run(start_bots("all"))
 
 
