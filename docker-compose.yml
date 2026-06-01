@@ -1,0 +1,13 @@
+services:
+  qorum:
+    build: .
+    ports:
+      - "7432:7432"
+      - "3978:3978"
+    env_file: qorum/.env
+    volumes:
+      - qorum_data:/app/qorum-output
+    restart: unless-stopped
+
+volumes:
+  qorum_data:
