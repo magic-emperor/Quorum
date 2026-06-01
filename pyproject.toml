@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qorum"
+version = "0.1.0"
+description = "Qorum — AI agent that turns team chat and board tickets into executed code"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+dependencies = [
+    # ── Core ─────────────────────────────────────────────────────────────────
+    "anthropic>=0.40.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "structlog>=24.0.0",
+    "aiofiles>=23.0.0",
+    "aiohttp>=3.9.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.0",
+    # ── Rendering ─────────────────────────────────────────────────────────────
+    "jinja2>=3.1.0",
+    "jsonschema>=4.21.0",
+    # ── State storage ─────────────────────────────────────────────────────────
+    "aiosqlite>=0.19.0",
+    # ── Agent def loader ──────────────────────────────────────────────────────
+    "PyYAML>=6.0",
+    # ── Python 3.9 compatibility ──────────────────────────────────────────────
+    "eval_type_backport>=0.2.0; python_version < '3.10'",
+]
+
+[project.optional-dependencies]
+# Platform adapters — install when the token is configured
+adapters = [
+    "azure-devops>=7.1.0b1",           # Azure Boards (7.x only available as beta on py3.9)
+    "requests>=2.31.0",
+    "gql>=3.5.0",                       # Linear (GraphQL)
+]
+bots = [
+    "python-telegram-bot>=21.0",
+    "slack-bolt>=1.18.0",
+    "nextcord>=2.6.0",
+]
+# Enable these in later phases as each feature is built
+providers = [
+    # Phase 2 — provider-agnostic AI layer
+    "openai>=1.30.0",
+    "google-genai>=0.8.0",
+    "mistralai>=0.4.0",
+]
+server = [
+    # Phase 10 — event bus + WebSocket server
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "websockets>=12.0",
+]
+teams = [
+    # Phase 12 — Microsoft Teams adapter
+    "botbuilder-core>=4.15.0",
+    "botbuilder-schema>=4.15.0",
+    "botbuilder-integration-aiohttp>=4.15.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-mock>=3.12.0",
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+qorum = "qorum.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["qorum*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["qorum/tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
