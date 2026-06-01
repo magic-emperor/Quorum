@@ -63,7 +63,8 @@ teams = [
 ]
 cloud = [
     # Optional: Turso cloud SQLite backend (set TURSO_DATABASE_URL + TURSO_AUTH_TOKEN)
-    "libsql-experimental>=0.0.9",
+    # Pure HTTP client — no Rust or CMake compilation required
+    "libsql-client>=0.3.0",
 ]
 dev = [
     "pytest>=8.0.0",
