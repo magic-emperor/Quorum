@@ -180,6 +180,27 @@ class JiraCloudAdapter(BaseTicketAdapter):
         except Exception as exc:
             log.warning("jira.update_status_failed", ticket=ticket_id, error=str(exc))
 
+    async def register_webhook(self, webhook_url: str, secret: str = "") -> dict:
+        """
+        Register a Jira webhook that fires on issue created/updated.
+        Only fires when issue text contains '[QORUM]' (JQL filter).
+        Returns the created webhook record.
+        """
+        base_url = (self._config.jira_cloud_base_url or "").rstrip("/")
+        if not base_url:
+            raise AdapterError("JIRA_BASE_URL not configured")
+
+        payload = {
+            "name": "Qorum webhook",
+            "url": webhook_url,
+            "events": ["jira:issue_created", "jira:issue_updated"],
+            "jqlFilter": 'text ~ "[QORUM]"',
+            "excludeIssueDetails": False,
+        }
+        result = await self._post(f"{base_url}/rest/webhooks/1.0/webhook", payload)
+        log.info("jira.webhook_registered", url=webhook_url, id=result.get("self"))
+        return result
+
     async def _post(self, url: str, payload: dict) -> dict:
         import json
         session = await self._get_session()
