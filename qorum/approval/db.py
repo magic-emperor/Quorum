@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 import aiosqlite
 
 from qorum.core.logger import get_logger
+from qorum.db.connection import db_connect, db_backend
 
 if TYPE_CHECKING:
     from qorum.approval.state_machine import TicketState
@@ -109,11 +110,10 @@ class ApprovalDB:
 
     async def init(self) -> None:
         """Create tables if they don't exist. Call once at startup."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             await conn.executescript(_CREATE_TABLES)
             await conn.commit()
-        log.info("approval_db.initialized", path=str(self._path))
+        log.info("approval_db.initialized", path=str(self._path), backend=db_backend())
 
     # ── Session persistence (B2) ─────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ class ApprovalDB:
     ) -> None:
         """Persist ticket + generation result so approve/refresh survive bot restart."""
         now = _now()
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             await conn.execute(
                 """
                 INSERT INTO ticket_sessions
@@ -146,7 +146,7 @@ class ApprovalDB:
 
     async def load_session(self, ticket_id: str) -> "dict[str, Any] | None":
         """Load a persisted session, or None if not found."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(
                 "SELECT * FROM ticket_sessions WHERE ticket_id = ?", (ticket_id,)
@@ -156,7 +156,7 @@ class ApprovalDB:
 
     async def delete_session(self, ticket_id: str) -> None:
         """Remove a session record (called after mark_done)."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             await conn.execute(
                 "DELETE FROM ticket_sessions WHERE ticket_id = ?", (ticket_id,)
             )
@@ -180,7 +180,7 @@ class ApprovalDB:
     ) -> None:
         """Insert or update a ticket's full state record."""
         now = _now()
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             await conn.execute(
                 """
                 INSERT INTO ticket_states
@@ -220,7 +220,7 @@ class ApprovalDB:
 
     async def get_ticket(self, ticket_id: str) -> dict[str, Any] | None:
         """Return the ticket's state record as a dict, or None if not found."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(
                 "SELECT * FROM ticket_states WHERE ticket_id = ?", (ticket_id,)
@@ -259,7 +259,7 @@ class ApprovalDB:
         query += " ORDER BY updated_at DESC LIMIT ?"
         params.append(limit)
 
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(query, params) as cursor:
                 rows = await cursor.fetchall()
@@ -284,7 +284,7 @@ class ApprovalDB:
         note: str | None = None,
     ) -> None:
         """Append a state transition to the audit log."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             await conn.execute(
                 """
                 INSERT INTO state_transitions
@@ -304,7 +304,7 @@ class ApprovalDB:
 
     async def get_transitions(self, ticket_id: str) -> list[dict[str, Any]]:
         """Return full transition history for a ticket."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(
                 "SELECT * FROM state_transitions WHERE ticket_id = ? ORDER BY occurred_at",
@@ -336,7 +336,7 @@ class ApprovalDB:
             actor:           User who gave the feedback.
         """
         flagged = 1 if rating == "needs_work" else 0
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             await conn.execute(
                 """
                 INSERT INTO artifact_feedback
@@ -365,7 +365,7 @@ class ApprovalDB:
 
     async def get_feedback(self, ticket_id: str) -> list[dict[str, Any]]:
         """Return all feedback entries for a ticket."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(
                 "SELECT * FROM artifact_feedback WHERE ticket_id = ? ORDER BY occurred_at",
@@ -381,7 +381,7 @@ class ApprovalDB:
 
     async def get_flagged_plans(self, limit: int = 20) -> list[dict[str, Any]]:
         """Return plans that received 'needs_work' feedback — for prompt improvement review."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(
                 """
@@ -410,7 +410,7 @@ class ApprovalDB:
         note: str | None = None,
     ) -> None:
         """Record or replace a user's vote (idempotent per plan+user)."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             await conn.execute(
                 """
                 INSERT INTO approval_votes
@@ -428,7 +428,7 @@ class ApprovalDB:
 
     async def get_votes(self, plan_id: str) -> list[dict[str, Any]]:
         """Return all votes for a plan."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(
                 "SELECT * FROM approval_votes WHERE plan_id = ? ORDER BY occurred_at",
@@ -445,7 +445,7 @@ class ApprovalDB:
         detail: dict | None = None,
     ) -> None:
         """Append an immutable event to the audit trail."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             await conn.execute(
                 """
                 INSERT INTO audit_trail (plan_id, event_type, actor, detail, occurred_at)
@@ -457,7 +457,7 @@ class ApprovalDB:
 
     async def get_audit_trail(self, plan_id: str) -> list[dict[str, Any]]:
         """Return full audit trail for a plan."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(
                 "SELECT * FROM audit_trail WHERE plan_id = ? ORDER BY occurred_at",
@@ -475,7 +475,7 @@ class ApprovalDB:
 
     async def get_stats(self) -> dict[str, Any]:
         """Return aggregate usage stats for /atlas stats command."""
-        async with aiosqlite.connect(self._path) as conn:
+        async with db_connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
 
             async with conn.execute("SELECT COUNT(*) as total FROM ticket_states") as c:
