@@ -58,6 +58,9 @@ def parse_args() -> argparse.Namespace:
     watch_p.add_argument("--poll", type=int, default=60, metavar="SECONDS")
     watch_p.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default=None)
 
+    # ── qorum doctor ─────────────────────────────────────────────────────────
+    subparsers.add_parser("doctor", help="Check all configured tokens, DB, and connectivity")
+
     # ── qorum test-url ────────────────────────────────────────────────────────
     url_p = subparsers.add_parser("test-url", help="Test URL detection without starting a bot")
     url_p.add_argument("url", help="Full ticket URL to test")
@@ -269,6 +272,10 @@ def main() -> None:
             reload=args.reload,
             log_level=(args.log_level or "info").lower(),
         )
+    elif command == "doctor":
+        from qorum.config import settings
+        ok = asyncio.run(__import__("qorum.doctor", fromlist=["run"]).run(settings))
+        sys.exit(0 if ok else 1)
     elif command == "watch":
         asyncio.run(_start_watch(args))
     elif command == "test-url":
