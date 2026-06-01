@@ -1,28 +1,49 @@
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
 dist/
-*.tsbuildinfo
-.DS_Store
-*.log
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+.venv2/
+venv/
+env/
+
+# Qorum runtime files
 .env
-.env.local
-
-# QUORUM config contains real API keys — NEVER commit this file
-# Use quorum.config.example.json as the committed template instead
-quorum.config.json
-atlas.config.json
-
-# Runtime directory — session data, plans, memory, API keys cache
-.atlas/
-.quorum/
-
-# Database files — auto-generated, never commit
 *.db
-*.db-journal
-*.db-wal
-*.db-shm
+qorum-output/
+logs/*.log
+logs/*.db
 
-# Legacy standalone Telegram bot — replaced by apps/quorum-bot
-apps/telegram-bot/
+# Secrets / credentials
+*.pem
+*.key
+secrets/
 
-# Generated output files
-output.ts
+# IDE
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Archive (reference only — do not accidentally re-commit)
+_archive/

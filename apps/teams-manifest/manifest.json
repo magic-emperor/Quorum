@@ -1,0 +1,52 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "$QORUM_TEAMS_APP_ID",
+  "packageName": "dev.qorum.bot",
+  "developer": {
+    "name": "Qorum",
+    "websiteUrl": "https://github.com/MagicEmperor/qorum",
+    "privacyUrl": "https://github.com/MagicEmperor/qorum",
+    "termsOfUseUrl": "https://github.com/MagicEmperor/qorum"
+  },
+  "name": {
+    "short": "Qorum",
+    "full": "Qorum — AI Engineering Agent"
+  },
+  "description": {
+    "short": "AI agent that turns chat decisions into approved plans, executed on a branch.",
+    "full": "Qorum watches your team chat, captures decisions, generates implementation plans, runs approvals, and executes on a git branch — all without leaving Teams."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#6264A7",
+  "bots": [
+    {
+      "botId": "$QORUM_TEAMS_APP_ID",
+      "scopes": ["team", "groupchat", "personal"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["team", "groupchat"],
+          "commands": [
+            { "title": "plan", "description": "Generate a plan from this conversation" },
+            { "title": "status", "description": "Show recent plans" },
+            { "title": "help", "description": "Show all commands" },
+            { "title": "map", "description": "Map this channel to a repo" },
+            { "title": "where", "description": "Show the mapped repo for this channel" }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["$QORUM_SERVER_HOST"],
+  "webApplicationInfo": {
+    "id": "$QORUM_TEAMS_APP_ID",
+    "resource": "https://graph.microsoft.com"
+  }
+}

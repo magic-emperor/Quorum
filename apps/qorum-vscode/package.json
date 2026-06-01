@@ -1,0 +1,62 @@
+{
+  "name": "qorum-vscode",
+  "displayName": "Qorum",
+  "description": "Real-time AI execution visibility — live diffs, file reveals, approve-to-commit.",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "qorum.connectRun", "title": "Qorum: Connect to Run" },
+      { "command": "qorum.showDashboard", "title": "Qorum: Open Dashboard" },
+      { "command": "qorum.approveDiff", "title": "Qorum: Approve Diff → Commit" },
+      { "command": "qorum.stopExecution", "title": "Qorum: Stop Execution" },
+      { "command": "qorum.discardRun", "title": "Qorum: Discard Execution" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "qorum-sidebar", "title": "Qorum", "icon": "media/qorum.svg" }
+      ]
+    },
+    "views": {
+      "qorum-sidebar": [
+        { "id": "qorumActivityTree", "name": "Activity", "type": "tree" }
+      ]
+    },
+    "configuration": {
+      "title": "Qorum",
+      "properties": {
+        "qorum.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:7432",
+          "description": "Qorum visibility server URL"
+        },
+        "qorum.token": {
+          "type": "string",
+          "default": "",
+          "description": "Authentication token (leave empty for local dev)"
+        },
+        "qorum.autoRevealFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-reveal files in the editor as the agent edits them"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "npx vsce package",
+    "test": "node ./out/test/runTests.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^18.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "typescript": "^5.3.0"
+  }
+}

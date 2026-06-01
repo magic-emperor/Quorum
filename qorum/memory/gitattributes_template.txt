@@ -1,0 +1,17 @@
+# Qorum .quorum/ merge strategies (Phase 14)
+# Copy the relevant lines into the TARGET repo's .gitattributes so concurrent
+# multi-developer commits to .quorum/ resolve cleanly.
+
+# Append-only files: union merge (keep both sides' added lines, never conflict).
+.quorum/collaboration/audit-trail.json   merge=union
+.quorum/collaboration/audit-trail.jsonl  merge=union
+.quorum/nervous-system/actions.json      merge=union
+.quorum/nervous-system/decisions.json    merge=union
+.quorum/nervous-system/reasoning.json    merge=union
+
+# Approval records are immutable once written — a conflict here means a bug;
+# treat as binary so git won't auto-merge (forces human review).
+.quorum/collaboration/approvals/*.json   -merge
+
+# Session transcripts: ours wins on conflict (each dev has their own session).
+.quorum/context/sessions/*.json          merge=ours
