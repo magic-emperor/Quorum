@@ -41,13 +41,14 @@ If NOT ACTIONABLE → output:
 Then STOP.
 
 ## Step 2: Work type (only if actionable)
-Classify as exactly one of: bug | feature | enhancement | refactor | chore | question
+Classify as exactly one of: bug | feature | enhancement | refactor | chore | question | version_bump
 - bug: something is broken and needs fixing
 - feature: net-new capability that doesn't exist
 - enhancement: existing capability being improved or extended
 - refactor: internal restructure with no user-visible change
 - chore: tooling, deps, CI, docs, config
 - question: the user wants an answer, not a code change
+- version_bump: explicitly bumping the project version (e.g. "bump version to 2.1.0", "release 3.0.0")
 
 ## Step 3: Complexity (only if not question)
 SIMPLE if ALL true: single module, CRUD only, no auth/payments/realtime, <3 entities, 1 person, <1 day.

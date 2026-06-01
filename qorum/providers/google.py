@@ -34,6 +34,8 @@ class GoogleProvider(LLMProvider):
                 max_output_tokens=8_192,
                 supports_system=True,
                 context_window=1_000_000,
+                native_web_search=True,   # Gemini Grounding / Google Search tool
+                native_thinking=False,
             )
         return Capabilities(json_mode=True, max_output_tokens=4_096)
 

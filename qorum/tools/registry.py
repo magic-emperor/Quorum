@@ -41,7 +41,7 @@ def build_registry(tool_names: list[str]) -> "ToolRegistry":
     from qorum.tools.fs import (
         ReadFileTool, WriteFileTool, EditFileTool, ListDirTool, GlobTool,
     )
-    from qorum.tools.search import GrepTool, FindSymbolTool
+    from qorum.tools.search import GrepTool, FindSymbolTool, WebSearchTool
     from qorum.tools.shell import RunCommandTool
     from qorum.tools.git import (
         GitStatusTool, GitDiffTool, GitStashTool, GitBranchTool,
@@ -52,7 +52,7 @@ def build_registry(tool_names: list[str]) -> "ToolRegistry":
 
     all_tools: list["QorumTool"] = [
         ReadFileTool(), WriteFileTool(), EditFileTool(), ListDirTool(), GlobTool(),
-        GrepTool(), FindSymbolTool(),
+        GrepTool(), FindSymbolTool(), WebSearchTool(),
         RunCommandTool(),
         GitStatusTool(), GitDiffTool(), GitStashTool(), GitBranchTool(),
         GitAddTool(), GitCommitTool(),

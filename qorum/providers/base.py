@@ -59,6 +59,8 @@ class Capabilities(BaseModel):
     max_output_tokens: int = 4096
     supports_system: bool = True         # Does the API accept a system message?
     context_window: int = 128_000
+    native_web_search: bool = False      # Provider has built-in web search (Claude, Gemini)
+    native_thinking: bool = False        # Provider has extended reasoning tokens (Claude 3.7+, o1/o3)
 
 
 # ── Abstract base ─────────────────────────────────────────────────────────────
