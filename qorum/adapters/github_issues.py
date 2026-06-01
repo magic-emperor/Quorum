@@ -113,6 +113,38 @@ class GitHubIssuesAdapter(BaseTicketAdapter):
     async def fetch_linked_items(self, item_id: str) -> list[LinkedItem]:
         return []
 
+    async def register_webhook(self, owner: str, repo: str, webhook_url: str, secret: str = "") -> dict:
+        """
+        Register a GitHub webhook on owner/repo that fires on issues events.
+        Returns the created hook record.
+        """
+        token = self._config.github_token
+        if not token:
+            raise AdapterError("GITHUB_TOKEN not configured")
+
+        payload: dict = {
+            "name": "web",
+            "active": True,
+            "events": ["issues", "issue_comment"],
+            "config": {
+                "url": webhook_url,
+                "content_type": "json",
+            },
+        }
+        if secret:
+            payload["config"]["secret"] = secret
+
+        session = await self._get_session()
+        url = f"https://api.github.com/repos/{owner}/{repo}/hooks"
+        async with session.post(url, json=payload) as resp:
+            if resp.status not in (200, 201):
+                text = await resp.text()
+                raise AdapterError(f"GitHub webhook registration failed ({resp.status}): {text}")
+            result = await resp.json()
+
+        log.info("github.webhook_registered", repo=f"{owner}/{repo}", url=webhook_url)
+        return result
+
     # ── Internal helpers ──────────────────────────────────────────────────────
 
     async def _get_issue(self, owner: str, repo: str, number: str) -> dict[str, Any]:
