@@ -61,6 +61,11 @@ teams = [
     "botbuilder-schema>=4.15.0",
     "botbuilder-integration-aiohttp>=4.15.0",
 ]
+cloud = [
+    # Optional: Turso cloud SQLite backend (set TURSO_DATABASE_URL + TURSO_AUTH_TOKEN)
+    # Pure HTTP client — no Rust or CMake compilation required
+    "libsql-client>=0.3.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
