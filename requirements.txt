@@ -1,0 +1,52 @@
+# Qorum — Python dependencies
+# Install with: pip install -r requirements.txt
+#
+# After installing, copy qorum/.env.example to qorum/.env and fill in your keys.
+# Then run: python -m qorum --help
+
+# ── Core ──────────────────────────────────────────────────────────────────────
+anthropic>=0.40.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+structlog>=24.0.0
+aiofiles>=23.0.0
+aiohttp>=3.9.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
+
+# ── Rendering ─────────────────────────────────────────────────────────────────
+jinja2>=3.1.0
+jsonschema>=4.21.0
+PyYAML>=6.0
+
+# ── Database ──────────────────────────────────────────────────────────────────
+aiosqlite>=0.19.0
+
+# ── AI Providers (all optional — set keys only for providers you use) ─────────
+openai>=1.30.0
+google-genai>=0.8.0
+mistralai>=0.4.0
+
+# ── Chat Platform Bots ────────────────────────────────────────────────────────
+python-telegram-bot>=21.0
+slack-bolt>=1.18.0
+nextcord>=2.6.0
+setuptools<81                       # nextcord needs pkg_resources
+
+# ── Microsoft Teams ───────────────────────────────────────────────────────────
+botbuilder-core>=4.15.0
+botbuilder-schema>=4.15.0
+botbuilder-integration-aiohttp>=4.15.0
+
+# ── Board Adapters ────────────────────────────────────────────────────────────
+azure-devops>=7.1.0b1
+requests>=2.31.0
+gql>=3.5.0                          # Linear (GraphQL)
+
+# ── Visibility Server ─────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+websockets>=12.0
+
+# ── Cloud DB (optional — only needed if using Turso) ─────────────────────────
+# libsql-client>=0.3.0
