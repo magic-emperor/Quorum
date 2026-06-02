@@ -285,20 +285,22 @@ class TelegramAdapter(BaseQorumAdapter):
             """Handle /qorum and /atlas commands + @mention triggers."""
             if not update.message:
                 return
-            # Buffer the message first
             await _buffer_message(update, context)
 
             args = context.args or []
-            text = " ".join(args)
-            # Phase 1 command path (legacy)
+            text = " ".join(args).strip()
+            subcommand = text.split()[0].lower() if text else "plan"
+
             ctx = _update_to_bot_ctx(update)
             asyncio.create_task(bot_self.handle_command(ctx, f"/qorum {text}"))
 
-            # Phase 4: fire mention handlers
-            chat_ctx = _update_to_chat_ctx(update, text)
-            if chat_ctx:
-                for handler in bot_self._mention_handlers:
-                    asyncio.create_task(handler(chat_ctx))
+            # Only fire the plan/mention flow for planning commands, not help/status/etc.
+            _INFO_COMMANDS = {"help", "status", "stats", "view", "refresh", "where", "link", "map"}
+            if subcommand not in _INFO_COMMANDS:
+                chat_ctx = _update_to_chat_ctx(update, text)
+                if chat_ctx:
+                    for handler in bot_self._mention_handlers:
+                        asyncio.create_task(handler(chat_ctx))
 
         async def _handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             """Handle direct @bot_username mentions in group chats."""
