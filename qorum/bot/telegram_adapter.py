@@ -109,17 +109,21 @@ class TelegramAdapter(BaseQorumAdapter):
 
     async def start(self) -> None:
         log.info("telegram.starting")
+        self._stop_event = asyncio.Event()
         await self._store.init()
         await self._app.initialize()
         await self._app.start()
-        # Register the Phase 5 boundary handler as a mention listener
         await self.on_mention(self.handle_mention)
         await self._app.updater.start_polling()
+        # Block here until stop() sets the event
+        await self._stop_event.wait()
 
     async def stop(self) -> None:
         await self._app.updater.stop()
         await self._app.stop()
         await self._app.shutdown()
+        if hasattr(self, "_stop_event"):
+            self._stop_event.set()
         log.info("telegram.stopped")
 
     # ── Phase 4: history / thread ─────────────────────────────────────────────
@@ -281,20 +285,22 @@ class TelegramAdapter(BaseQorumAdapter):
             """Handle /qorum and /atlas commands + @mention triggers."""
             if not update.message:
                 return
-            # Buffer the message first
             await _buffer_message(update, context)
 
             args = context.args or []
-            text = " ".join(args)
-            # Phase 1 command path (legacy)
+            text = " ".join(args).strip()
+            subcommand = text.split()[0].lower() if text else "plan"
+
             ctx = _update_to_bot_ctx(update)
             asyncio.create_task(bot_self.handle_command(ctx, f"/qorum {text}"))
 
-            # Phase 4: fire mention handlers
-            chat_ctx = _update_to_chat_ctx(update, text)
-            if chat_ctx:
-                for handler in bot_self._mention_handlers:
-                    asyncio.create_task(handler(chat_ctx))
+            # Only fire the plan/mention flow for planning commands, not help/status/etc.
+            _INFO_COMMANDS = {"help", "status", "stats", "view", "refresh", "where", "link", "map"}
+            if subcommand not in _INFO_COMMANDS:
+                chat_ctx = _update_to_chat_ctx(update, text)
+                if chat_ctx:
+                    for handler in bot_self._mention_handlers:
+                        asyncio.create_task(handler(chat_ctx))
 
         async def _handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             """Handle direct @bot_username mentions in group chats."""

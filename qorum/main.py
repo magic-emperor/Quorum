@@ -160,13 +160,11 @@ def _build_bots(platform: str, orchestrator) -> list:
     from qorum.bot.discord_adapter import DiscordAdapter
     from qorum.bot.telegram_adapter import TelegramAdapter
 
-    # Normalise: comma-separated list → membership check
+    # Support comma-separated list: "telegram,discord" from --telegram --discord
     selected = {p.strip() for p in platform.split(",")} if "," in platform else None
 
     def _want(name: str) -> bool:
-        if selected:
-            return name in selected
-        return platform in (name, "all")
+        return (name in selected) if selected else platform in (name, "all")
 
     want_slack    = _want("slack")
     want_discord  = _want("discord")
@@ -300,19 +298,17 @@ def main() -> None:
         asyncio.run(_start_watch(args))
     elif command == "test-url":
         asyncio.run(test_url(args.url))
-    elif args.test_url:          # legacy flag
+    elif args.test_url:
         asyncio.run(test_url(args.test_url))
-    elif args.platform:          # legacy --platform flag
+    elif args.platform:
         asyncio.run(start_bots(args.platform))
     elif any([args.teams, args.slack, args.discord, args.telegram, args.whatsapp]):
-        # Short flags: qorum --teams, qorum --slack --discord, etc.
         selected = [p for p, flag in [
             ("teams", args.teams), ("slack", args.slack), ("discord", args.discord),
             ("telegram", args.telegram), ("whatsapp", args.whatsapp),
         ] if flag]
         asyncio.run(start_bots(",".join(selected)))
     else:
-        # Default: start all configured bots
         asyncio.run(start_bots("all"))
 
 

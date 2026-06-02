@@ -67,8 +67,9 @@ async def run(config: "QorumConfig") -> bool:
 
     # ── Board adapters ────────────────────────────────────────────────────────
     board_checks = [
-        ("Jira",          config.jira_base_url and config.jira_token),
-        ("Azure Boards",  config.azure_devops_token and config.azure_devops_org),
+        ("Jira Cloud",    config.jira_cloud_email and config.jira_cloud_api_token),
+        ("Jira Server",   config.jira_server_pat),
+        ("Azure Boards",  config.azure_devops_pat),
         ("GitHub Issues", config.github_token),
         ("Linear",        config.linear_api_key),
     ]
