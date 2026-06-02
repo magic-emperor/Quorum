@@ -1,46 +1,49 @@
+# This file is kept for reference. Use the root requirements.txt instead:
+#   pip install -r requirements.txt   (from the repo root D:\Atlas)
+#
 # ── Core ──────────────────────────────────────────────────────────────────────
-anthropic>=0.40.0                   # Claude API (Sonnet/Haiku/Opus)
-pydantic>=2.0.0                     # Data validation
-pydantic-settings>=2.0.0            # Config from env vars
-structlog>=24.0.0                   # Structured JSON logging
-aiohttp>=3.9.0                      # Async HTTP client (adapters)
-python-dotenv>=1.0.0                # .env file loading
+anthropic>=0.40.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+structlog>=24.0.0
+aiohttp>=3.9.0
+aiofiles>=23.0.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
+PyYAML>=6.0
 
-# ── Ticket Platform Adapters ───────────────────────────────────────────────────
-azure-devops>=7.1.0                 # Azure Boards official SDK
-requests>=2.31.0                    # Sync HTTP (fallback, Azure SDK uses it)
-gql>=3.5.0                          # GraphQL client (Linear adapter)
-aiofiles>=23.0.0                    # Async file I/O (output manager)
+# ── Board Adapters ────────────────────────────────────────────────────────────
+azure-devops>=7.1.0b1               # Azure Boards (only beta releases on PyPI)
+requests>=2.31.0
+gql>=3.5.0                          # Linear (GraphQL)
 
 # ── Bot Platforms ─────────────────────────────────────────────────────────────
-slack-bolt>=1.18.0                  # Slack bot (ack-first async pattern)
-nextcord>=2.6.0                     # Discord bot (slash commands)
-python-telegram-bot>=21.0           # Telegram bot (async-native)
-setuptools<81                       # nextcord needs pkg_resources (removed in setuptools 81+)
-# WhatsApp Cloud API uses aiohttp (already listed) + the Phase 10 webhook server
+slack-bolt>=1.18.0
+nextcord>=2.6.0
+python-telegram-bot>=21.0
+setuptools<81
+
+# ── Microsoft Teams ───────────────────────────────────────────────────────────
+botbuilder-core>=4.15.0
+botbuilder-schema>=4.15.0
+botbuilder-integration-aiohttp>=4.15.0
 
 # ── State Storage ─────────────────────────────────────────────────────────────
-aiosqlite>=0.19.0                   # Async SQLite (approval state machine)
-
-# ── Background Jobs ───────────────────────────────────────────────────────────
-rq>=1.16.0                          # Redis job queue (production scale)
-redis>=5.0.0                        # Redis client
+aiosqlite>=0.19.0
 
 # ── Output Rendering ──────────────────────────────────────────────────────────
-jinja2>=3.1.0                       # plan.md / testing.md / walkthrough.md templates
-jsonschema>=4.21.0                  # Validate AI JSON output before rendering
+jinja2>=3.1.0
+jsonschema>=4.21.0
 
-# ── Microsoft Teams Bot (Phase 12) ───────────────────────────────────────────
-botbuilder-core>=4.17.0             # Bot Framework SDK — Teams bot activities
-botbuilder-schema>=4.17.0           # Activity / Attachment schema types
-botframework-connector>=4.17.0      # Authentication + connector client
+# ── Visibility Server ─────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+websockets>=12.0
 
-# ── Visibility Server (Phase 10) ─────────────────────────────────────────────
-fastapi>=0.110.0                    # REST + WebSocket server
-uvicorn[standard]>=0.29.0           # ASGI server
-websockets>=12.0                    # WS support for uvicorn
+# ── AI Providers (optional — install only for providers you use) ──────────────
+openai>=1.30.0
+google-genai>=0.8.0
+mistralai>=0.4.0
 
-# ── Testing ───────────────────────────────────────────────────────────────────
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-pytest-mock>=3.12.0
+# ── Cloud DB (optional — only if using Turso) ─────────────────────────────────
+# libsql-client>=0.3.0
