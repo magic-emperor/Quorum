@@ -109,17 +109,21 @@ class TelegramAdapter(BaseQorumAdapter):
 
     async def start(self) -> None:
         log.info("telegram.starting")
+        self._stop_event = asyncio.Event()
         await self._store.init()
         await self._app.initialize()
         await self._app.start()
-        # Register the Phase 5 boundary handler as a mention listener
         await self.on_mention(self.handle_mention)
         await self._app.updater.start_polling()
+        # Block here until stop() sets the event
+        await self._stop_event.wait()
 
     async def stop(self) -> None:
         await self._app.updater.stop()
         await self._app.stop()
         await self._app.shutdown()
+        if hasattr(self, "_stop_event"):
+            self._stop_event.set()
         log.info("telegram.stopped")
 
     # ── Phase 4: history / thread ─────────────────────────────────────────────
