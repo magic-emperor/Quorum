@@ -644,6 +644,10 @@ class BaseQorumAdapter(ABC):
         elif subcommand == "link":
             await self._handle_link(ctx, flags.get("link_arg", ""))
 
+        elif subcommand in ("plan", "stop", "cancel"):
+            # These are handled by the mention/button handlers — no action needed here
+            pass
+
         elif _URL_RE.match(subcommand):
             mode = PlanMode.BRIEF if flags.get("brief") else PlanMode.FULL
             await self._handle_url(ctx, subcommand, mode)
