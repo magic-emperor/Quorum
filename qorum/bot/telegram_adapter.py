@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from telegram import (
@@ -53,12 +55,20 @@ log = get_logger(__name__)
 
 _PLATFORM = "telegram"
 
-# Callback data: JSON-encoded {"action": "...", "ticket_id": "...", ...}
+# Callback data: JSON-encoded {"a": "<action>", "<short-key>": "<value>", ...}
 _CB_MAX = 64   # Telegram callback_data limit is 64 bytes — keep payloads small
+
+# Full payload key ↔ short key map, so encode/decode stay symmetric. The two
+# directions are derived from one source: a short key that isn't expanded back
+# (the historical `capture_id`→`cap` bug) silently dropped the value and caused
+# every boundary-card button to report "Session expired".
+_CB_KEY_SHORT = {"ticket_id": "tic", "capture_id": "cap", "artifact": "art"}
+_CB_KEY_LONG = {short: full for full, short in _CB_KEY_SHORT.items()}
 
 
 def _encode_cb(action: str, payload: dict) -> str:
-    data = json.dumps({"a": action, **{k[:3]: v for k, v in payload.items()}})
+    short = {_CB_KEY_SHORT.get(k, k[:3]): v for k, v in payload.items()}
+    data = json.dumps({"a": action, **short})
     return data[:_CB_MAX]
 
 
@@ -66,15 +76,7 @@ def _decode_cb(data: str) -> tuple[str, dict]:
     try:
         d = json.loads(data)
         action = d.pop("a", "")
-        # Expand short keys back
-        expanded = {}
-        for k, v in d.items():
-            if k == "tic":
-                expanded["ticket_id"] = v
-            elif k == "art":
-                expanded["artifact"] = v
-            else:
-                expanded[k] = v
+        expanded = {_CB_KEY_LONG.get(k, k): v for k, v in d.items()}
         return action, expanded
     except Exception:
         return "", {}
@@ -107,7 +109,26 @@ class TelegramAdapter(BaseQorumAdapter):
 
     # ── Bot lifecycle ─────────────────────────────────────────────────────────
 
+    _PID_FILE = Path("qorum-telegram.pid")
+
     async def start(self) -> None:
+        # Single-instance guard: refuse to start if another process holds the PID file.
+        # Uses only stdlib — no psutil required.
+        if self._PID_FILE.exists():
+            try:
+                existing_pid = int(self._PID_FILE.read_text().strip())
+                os.kill(existing_pid, 0)  # signal 0 = existence check, no side effects
+                log.error(
+                    "telegram.already_running",
+                    pid=existing_pid,
+                    detail=f"Another Telegram bot is already running (PID {existing_pid}). "
+                           f"Stop it first, then retry.",
+                )
+                raise SystemExit(1)
+            except (ValueError, OSError):
+                pass  # stale PID (process gone) or unreadable — overwrite
+        self._PID_FILE.write_text(str(os.getpid()))
+
         log.info("telegram.starting")
         self._stop_event = asyncio.Event()
         await self._store.init()
@@ -126,6 +147,7 @@ class TelegramAdapter(BaseQorumAdapter):
         await self._app.shutdown()
         if hasattr(self, "_stop_event"):
             self._stop_event.set()
+        self._PID_FILE.unlink(missing_ok=True)
         log.info("telegram.stopped")
 
     # ── Phase 4: history / thread ─────────────────────────────────────────────
@@ -333,6 +355,14 @@ class TelegramAdapter(BaseQorumAdapter):
                 return
             await _buffer_message(update, context)
 
+            channel_id = str(update.message.chat_id)
+            text = update.message.text or ""
+
+            # Pending clarification reply — resume plan flow with user's answer
+            if text and channel_id in bot_self._pending_clarification:
+                asyncio.create_task(bot_self.handle_clarification_reply(channel_id, text))
+                return
+
             # Phase 1 feedback reply path
             if context.chat_data is None:
                 return
@@ -374,12 +404,34 @@ class TelegramAdapter(BaseQorumAdapter):
             # Phase 1 / dispatch_button (for actions not yet wired in Phase 4 handlers)
             asyncio.create_task(bot_self.dispatch_button(click))
 
+        async def _on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+            """Surface polling errors that PTB otherwise swallows silently.
+
+            A 409 Conflict means another process is polling getUpdates with the
+            same bot token (e.g. a stale local run, or the legacy TypeScript bot).
+            When that happens, updates are split between processes, so a button
+            callback can land on a process that never stored the capture session
+            → a false "Session expired". Make it loud instead of invisible.
+            """
+            from telegram.error import Conflict
+            err = context.error
+            if isinstance(err, Conflict):
+                log.error(
+                    "telegram.poll_conflict",
+                    detail="Another process is polling this bot token (getUpdates 409). "
+                           "Run only ONE bot instance per token — kill stale runs and do not "
+                           "run the legacy apps/quorum-bot alongside the Python bot.",
+                )
+            else:
+                log.error("telegram.update_error", error=str(err))
+
         # Register all handlers
         app.add_handler(CommandHandler("qorum", _handle_command))
         app.add_handler(CommandHandler("atlas", _handle_command))   # legacy alias
         app.add_handler(CallbackQueryHandler(_handle_callback))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _handle_all_messages))
         app.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, _handle_edited))
+        app.add_error_handler(_on_error)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

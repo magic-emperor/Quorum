@@ -215,8 +215,11 @@ async def _run_native(
                 error=f"Token budget exceeded ({tokens_used} > {agent.max_tokens_total})",
             )
 
-        if resp.text:
-            messages.append(LLMMessage(role="assistant", content=resp.text))
+        messages.append(LLMMessage(
+            role="assistant",
+            content=resp.text,
+            tool_calls=resp.tool_calls,
+        ))
 
         if resp.finish_reason == "stop" or not resp.tool_calls:
             _save_transcript(run_id, agent.name, messages, quorum_dir)

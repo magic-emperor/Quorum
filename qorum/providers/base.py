@@ -22,6 +22,7 @@ class LLMMessage:
     content: str
     name: Optional[str] = None           # for "tool" role: tool name
     tool_call_id: Optional[str] = None   # for "tool" role: links to ToolCall.id
+    tool_calls: list = field(default_factory=list)  # for "assistant" role: outgoing tool calls
 
 
 @dataclass

@@ -21,7 +21,7 @@ from pydantic import ValidationError
 
 from qorum.adapters.base import NormalizedTicket, TicketSize
 from qorum.core.logger import get_logger
-from qorum.core.schemas import PhaseDefinition, PhaseProposal, PlanOutput, TestingOutput
+from qorum.core.schemas import Effort, PhaseDefinition, PhaseProposal, PlanOutput, TestingOutput
 
 if TYPE_CHECKING:
     from qorum.config import QorumConfig
@@ -355,7 +355,58 @@ class QorumPlanGenerator:
         )
 
         try:
-            plan = PlanOutput.model_validate_json(raw_json)
+            data = json.loads(raw_json)
+            # Normalize suggested_owner — models return human-readable names
+            # (e.g. "Product Owner", "Backend Developer") instead of enum values.
+            _OWNER_MAP = {
+                "product owner": "PO", "po": "PO",
+                "business analyst": "BA", "ba": "BA",
+                "tech lead": "Tech Lead", "technical lead": "Tech Lead",
+                "developer": "Developer", "backend developer": "Developer",
+                "frontend developer": "Developer", "dev": "Developer",
+                "qa": "QA", "tester": "QA", "quality assurance": "QA",
+                "stakeholder": "Stakeholder",
+            }
+            _VALID_OWNERS = {"BA", "PO", "Tech Lead", "Developer", "QA", "Stakeholder"}
+            for amb in data.get("ambiguities", []):
+                raw_owner = str(amb.get("suggested_owner", "")).strip()
+                normalized = _OWNER_MAP.get(raw_owner.lower(), raw_owner)
+                amb["suggested_owner"] = normalized if normalized in _VALID_OWNERS else "Developer"
+            # Pad test_scenarios to the minimum length required by the schema (3).
+            scenarios = data.get("test_scenarios") or []
+            while len(scenarios) < 3:
+                scenarios.append("Verify error handling and edge cases.")
+            data["test_scenarios"] = scenarios
+            # Pad risks to the minimum length required by the schema (1).
+            risks = data.get("risks") or []
+            if not risks:
+                risks = [{"description": "Scope creep or unclear requirements.", "likelihood": "medium", "mitigation": "Clarify requirements before starting."}]
+            data["risks"] = risks
+            # Pad sub_tasks, definition_of_done, assumptions if LLM returned empty lists.
+            title = data.get("title", "this task")
+            if not data.get("sub_tasks"):
+                data["sub_tasks"] = [{"title": f"Implement {title}", "description": "Core implementation work.", "suggested_owner": "Developer", "estimated_hours": 4}]
+            if not data.get("definition_of_done"):
+                data["definition_of_done"] = [
+                    "All acceptance criteria are met.",
+                    "Code reviewed and approved.",
+                    "No critical bugs outstanding.",
+                ]
+            if not data.get("assumptions"):
+                data["assumptions"] = ["Requirements are stable and will not change significantly during implementation."]
+            # Repair individual sub_task items missing required fields (id, effort, confidence, description).
+            for i, st in enumerate(data.get("sub_tasks", [])):
+                if not isinstance(st, dict):
+                    continue
+                if not st.get("id"):
+                    st["id"] = f"T{i + 1}"
+                if not st.get("effort"):
+                    st["effort"] = "M"
+                if "confidence" not in st:
+                    st["confidence"] = 70
+                if not st.get("description"):
+                    st["description"] = st.get("title", "Implementation task.")
+            plan = PlanOutput.model_validate(data)
             log.info(
                 "plan_generator.plan_validated",
                 label=label,

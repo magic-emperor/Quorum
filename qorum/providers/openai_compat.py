@@ -156,6 +156,15 @@ class OpenAICompatibleProvider(LLMProvider):
                     "tool_call_id": m.tool_call_id or "",
                     "content": m.content,
                 })
+            elif m.role == "assistant" and m.tool_calls:
+                result.append({
+                    "role": "assistant",
+                    "content": m.content or "",
+                    "tool_calls": [
+                        {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)}}
+                        for tc in m.tool_calls
+                    ],
+                })
             else:
                 result.append({"role": m.role, "content": m.content})
         return result

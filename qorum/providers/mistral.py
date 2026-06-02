@@ -57,7 +57,21 @@ class MistralProvider(LLMProvider):
         client = Mistral(api_key=self._api_key)
         caps = self.capabilities(model)
 
-        msgs = [{"role": m.role, "content": m.content} for m in messages]
+        msgs = []
+        for m in messages:
+            if m.role == "tool":
+                msgs.append({"role": "tool", "tool_call_id": m.tool_call_id or "", "content": m.content or "", "name": m.name or ""})
+            elif m.role == "assistant" and m.tool_calls:
+                msgs.append({
+                    "role": "assistant",
+                    "content": m.content or "",
+                    "tool_calls": [
+                        {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)}}
+                        for tc in m.tool_calls
+                    ],
+                })
+            else:
+                msgs.append({"role": m.role, "content": m.content or ""})
         if json_mode and not caps.json_mode:
             msgs[-1]["content"] = str(msgs[-1]["content"]) + self.build_json_system_suffix()
 

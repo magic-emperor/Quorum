@@ -157,7 +157,7 @@ class ChatSummary(BaseModel):
 
 # ── Classification (Phase 6) ──────────────────────────────────────────────────
 
-WorkType = Literal["bug", "feature", "enhancement", "refactor", "chore", "question"]
+WorkType = Literal["bug", "feature", "enhancement", "refactor", "chore", "question", "version_bump"]
 ComplexityLevel = Literal["SIMPLE", "COMPLEX"]
 ModelTier = Literal["fast", "default", "premium"]
 
