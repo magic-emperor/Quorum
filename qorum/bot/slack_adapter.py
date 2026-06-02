@@ -275,7 +275,7 @@ class SlackAdapter(BaseQorumAdapter):
 
         @app.event("message")
         async def handle_message(body, event):
-            """Capture free-text replies for the request_changes feedback flow."""
+            """Capture free-text replies for clarification and request_changes feedback."""
             channel_id = event.get("channel", "")
             user_id = event.get("user", "")
             text = event.get("text", "")
@@ -283,6 +283,11 @@ class SlackAdapter(BaseQorumAdapter):
 
             # Ignore bot messages and edits
             if subtype or not text or not user_id:
+                return
+
+            # Clarification reply takes priority over feedback reply
+            if channel_id in bot_self._pending_clarification:
+                asyncio.create_task(bot_self.handle_clarification_reply(channel_id, text))
                 return
 
             # Check if this channel is waiting for feedback

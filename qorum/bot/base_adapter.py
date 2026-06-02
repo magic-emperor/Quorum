@@ -53,6 +53,18 @@ class BotContext:
 
 _URL_RE = re.compile(r"https?://\S+")
 
+
+async def _check_has_remote(runner) -> bool:
+    """Return True if the runner's repo has a remote (best-effort)."""
+    try:
+        from qorum.execution.git_flow import has_remote
+        repo = runner._locate.target_repo or runner._locate.scaffold_path
+        if repo:
+            return await has_remote(repo)
+    except Exception:
+        pass
+    return False
+
 def parse_qorum_command(text: str) -> tuple[str | None, dict[str, Any]]:
     """
     Parse /atlas command text.
@@ -95,7 +107,7 @@ def parse_qorum_command(text: str) -> tuple[str | None, dict[str, Any]]:
     # Keyword commands
     parts = text.split(maxsplit=1)
     subcommand = parts[0].lower()
-    if subcommand in ("status", "help", "stats", "where"):
+    if subcommand in ("status", "help", "stats", "where", "plan", "stop", "cancel"):
         return (subcommand, flags)
     if subcommand in ("view", "refresh"):
         if len(parts) > 1:
@@ -148,11 +160,19 @@ class BaseQorumAdapter(ABC):
         self._capture_card_messages: dict[str, str] = {}   # capture_id → card message_id
         # Phase 7: quorum approval state keyed by plan_id
         self._quorum_sessions: dict = {}   # plan_id → QuorumState
+        # Phase 8: execution context (plan/locate/classification) cached between approval and Execute click
+        self._execution_context: dict = {}   # plan_id → (PlanOutput, LocateResult, Classification)
         # Phase 8: execution results pending diff approval keyed by plan_id
         self._execution_results: dict = {}   # plan_id → (ExecutionResult, ExecutionRunner)
         # Phase 14.1: live executions keyed by plan_id → (asyncio.Task, CancellationToken)
         self._active_executions: dict = {}
         self._progress_cards: dict[str, str] = {}   # plan_id → progress card message_id
+        # Phase 6: pending clarification — keyed by channel_id
+        # Value: (Intent, thread_id | None)  — resumed when the user's plain-text reply arrives
+        self._pending_clarification: dict[str, tuple] = {}
+        # Phase 6: pending after /qorum map — keyed by channel_id
+        # Value: (Intent, Classification, thread_id | None) — resumed after channel is mapped
+        self._pending_after_map: dict[str, tuple] = {}
 
     # ── Abstract interface (platform-specific) ────────────────────────────────
 
@@ -285,6 +305,19 @@ class BaseQorumAdapter(ABC):
         Route a button click to the correct orchestrator action.
         Called by every platform's button callback handler.
         """
+        try:
+            await self._dispatch_button_inner(click)
+        except Exception as exc:
+            log.exception("bot.dispatch_button_error", action=click.action, error=str(exc))
+            try:
+                await self.send_message(
+                    click.channel_id,
+                    f"[!] Something went wrong processing that button: {str(exc)[:200]}",
+                )
+            except Exception:
+                pass
+
+    async def _dispatch_button_inner(self, click: ButtonClick) -> None:
         action = click.action
         payload = click.payload
         ticket_id = payload.get("ticket_id", "")
@@ -353,6 +386,7 @@ class BaseQorumAdapter(ABC):
         elif action == BotAction.BOUNDARY_CANCEL:
             capture_id = payload.get("capture_id", "")
             self._capture_sessions.pop(capture_id, None)
+            await self._forget_capture(capture_id)
             await self.edit_message(
                 click.channel_id, click.message_id, "_Capture cancelled._"
             )
@@ -360,7 +394,29 @@ class BaseQorumAdapter(ABC):
         # ── Phase 8: execution buttons ────────────────────────────────────────
         elif action == BotAction.EXECUTE:
             plan_id = payload.get("ticket_id", "")
-            await self.handle_execute(click.channel_id, plan_id)
+            cached = self._execution_context.pop(plan_id, None)
+            if cached is None:
+                # Try DB restore
+                cached = await self._restore_execution_context(plan_id)
+            if cached:
+                plan, locate, classification = cached
+                # Drop the persisted copy — one-shot use
+                try:
+                    del_ctx = getattr(self._orchestrator, "delete_execution_context", None)
+                    if del_ctx:
+                        await del_ctx(plan_id)
+                except Exception:
+                    pass
+                await self.handle_execute(
+                    click.channel_id, plan_id,
+                    plan=plan, locate=locate, classification=classification,
+                )
+            else:
+                await self.send_message(
+                    click.channel_id,
+                    f"[!] Execution context for `{plan_id}` has expired. "
+                    f"Re-trigger `/qorum plan` to regenerate.",
+                )
 
         elif action == BotAction.STOP_EXECUTION:
             plan_id = payload.get("ticket_id", "")
@@ -396,6 +452,8 @@ class BaseQorumAdapter(ABC):
 
         # Store the capture keyed by capture_id for the confirm-card button handlers
         self._capture_sessions[capture.capture_id] = (capture, ctx, engine)
+        # Mirror to the DB so the callback survives a restart / lands on any process
+        await self._persist_capture(capture, ctx)
 
         card_text = capture.confirm_card_text()
         msg_id = await self.send_buttons(
@@ -414,6 +472,106 @@ class BaseQorumAdapter(ABC):
             messages=capture.message_count,
         )
 
+    # ── Capture session persistence ───────────────────────────────────────────
+    # The (CaptureWindow, ChatContext) pair is kept in memory AND mirrored to the
+    # DB so a button callback that arrives after a restart — or on a different
+    # process polling the same token — still resolves instead of replying
+    # "Session expired". BoundaryEngine carries no per-session state, so it is
+    # rebuilt from config on restore rather than serialized.
+
+    async def _persist_execution_context(
+        self, plan_id: str, plan: Any, locate: Any, classification: Any
+    ) -> None:
+        """Best-effort persist of execution context so Execute button survives restarts."""
+        save = getattr(self._orchestrator, "save_execution_context", None)
+        if save is None:
+            return
+        try:
+            await save(
+                plan_id=plan_id,
+                plan_json=plan.model_dump_json() if hasattr(plan, "model_dump_json") else "{}",
+                locate_json=locate.model_dump_json() if hasattr(locate, "model_dump_json") else "{}",
+                classify_json=classification.model_dump_json() if hasattr(classification, "model_dump_json") else "{}",
+            )
+        except Exception as exc:
+            log.debug("execution_context.persist_skipped", plan_id=plan_id, error=str(exc))
+
+    async def _restore_execution_context(self, plan_id: str):
+        """Try to rebuild (PlanOutput, LocateResult, Classification) from the DB. Returns tuple or None."""
+        load = getattr(self._orchestrator, "load_execution_context", None)
+        if load is None:
+            return None
+        try:
+            rec = await load(plan_id)
+        except Exception as exc:
+            log.debug("execution_context.restore_skipped", plan_id=plan_id, error=str(exc))
+            return None
+        if not rec:
+            return None
+        try:
+            from qorum.core.schemas import PlanOutput
+            from qorum.collaboration.schemas import LocateResult, Classification
+            plan = PlanOutput.model_validate_json(rec["plan_json"])
+            locate = LocateResult.model_validate_json(rec["locate_json"])
+            classification = Classification.model_validate_json(rec["classify_json"])
+            log.info("execution_context.restored_from_db", plan_id=plan_id)
+            return (plan, locate, classification)
+        except Exception as exc:
+            log.warning("execution_context.restore_failed", plan_id=plan_id, error=str(exc))
+            return None
+
+    async def _persist_capture(self, capture: Any, ctx: Any) -> None:
+        """Best-effort write of a capture session to the DB."""
+        save = getattr(self._orchestrator, "save_capture", None)
+        if save is None:
+            return
+        try:
+            from qorum.bot.capture_serde import capture_to_json, ctx_to_json
+            await save(
+                capture_id=capture.capture_id,
+                platform=ctx.platform,
+                channel_id=ctx.channel_id,
+                capture_json=capture_to_json(capture),
+                ctx_json=ctx_to_json(ctx),
+            )
+        except Exception as exc:  # best-effort: never block the chat flow on persistence
+            log.debug("capture.persist_skipped",
+                      capture_id=getattr(capture, "capture_id", "?"), error=str(exc))
+
+    async def _restore_capture(self, capture_id: str):
+        """Rebuild (CaptureWindow, ChatContext, BoundaryEngine) from the DB, or None."""
+        load = getattr(self._orchestrator, "load_capture", None)
+        if load is None:
+            return None
+        try:
+            rec = await load(capture_id)
+        except Exception as exc:
+            log.debug("capture.restore_skipped", capture_id=capture_id, error=str(exc))
+            return None
+        if not rec:
+            return None
+        try:
+            from qorum.bot.capture_serde import capture_from_json, ctx_from_json
+            from qorum.collaboration.ingester import BoundaryEngine
+            capture = capture_from_json(rec["capture_json"])
+            ctx = ctx_from_json(rec["ctx_json"])
+            engine = BoundaryEngine(self._config)
+            log.info("capture.restored_from_db", capture_id=capture_id)
+            return (capture, ctx, engine)
+        except Exception as exc:
+            log.warning("capture.restore_failed", capture_id=capture_id, error=str(exc))
+            return None
+
+    async def _forget_capture(self, capture_id: str) -> None:
+        """Best-effort delete of a persisted capture session."""
+        delete = getattr(self._orchestrator, "delete_capture", None)
+        if delete is None:
+            return
+        try:
+            await delete(capture_id)
+        except Exception as exc:
+            log.debug("capture.delete_skipped", capture_id=capture_id, error=str(exc))
+
     async def handle_boundary_proceed(
         self,
         channel_id: str,
@@ -423,8 +581,12 @@ class BaseQorumAdapter(ABC):
         """User confirmed the window — summarise and build Intent."""
         session = self._capture_sessions.pop(capture_id, None)
         if not session:
+            session = await self._restore_capture(capture_id)
+        if not session:
             await self.send_message(channel_id, "_Session expired. Please re-trigger @Qorum._")
             return
+        # One-shot: drop the persisted copy so a duplicate callback can't re-run it.
+        await self._forget_capture(capture_id)
 
         capture, ctx, _ = session
         await self.edit_message(
@@ -449,7 +611,7 @@ class BaseQorumAdapter(ABC):
             log.error("bot.summarise_failed", error=str(exc))
             await self.send_message(
                 channel_id,
-                "⚠ Summarisation failed. Please try again or describe the task directly.",
+                "[!] Summarisation failed. Please try again or describe the task directly.",
             )
             return
 
@@ -482,10 +644,12 @@ class BaseQorumAdapter(ABC):
             classification = await classifier.classify(intent)
         except ClassificationError as exc:
             log.error("bot.classify_failed", error=str(exc))
-            await self.send_message(channel_id, "⚠ Classification failed. Please try again.")
+            await self.send_message(channel_id, "[!] Classification failed. Please try again.")
             return
 
         if classification.needs_clarification:
+            self._pending_clarification[channel_id] = (intent, ctx.thread_id if ctx else None)
+            log.info("bot.clarification_pending", channel_id=channel_id, question=classification.clarifying_question)
             await self.send_message(channel_id, classification.clarifying_question or "Could you clarify the request?")
             return
 
@@ -501,9 +665,11 @@ class BaseQorumAdapter(ABC):
         locate_result = await locator.locate(intent, classification)
 
         if locate_result.needs_human_input:
+            self._pending_after_map[channel_id] = (intent, classification, ctx.thread_id if ctx else None)
             await self.send_message(
                 channel_id,
-                locate_result.clarifying_question or "I need more information about the target repo.",
+                (locate_result.clarifying_question or "I need more information about the target repo.")
+                + "\nOnce mapped, I'll continue the plan automatically.",
             )
             return
 
@@ -527,7 +693,7 @@ class BaseQorumAdapter(ABC):
             gen_result = await generator.generate_plan_from_intent(intent, classification)
         except PlanGenerationError as exc:
             log.error("bot.plan_gen_failed", error=str(exc))
-            await self.send_message(channel_id, f"⚠ Plan generation failed: {exc}")
+            await self.send_message(channel_id, f"[!] Plan generation failed: {str(exc)[:300]}")
             return
 
         # Write plan.md + task.md into target .quorum/
@@ -544,7 +710,7 @@ class BaseQorumAdapter(ABC):
         first_plan = gen_result.plans[0].plan if gen_result.plans else None
 
         if not first_plan:
-            await self.send_message(channel_id, "⚠ No plan generated.")
+            await self.send_message(channel_id, "[!] No plan generated.")
             return
 
         # Persist approval state
@@ -554,6 +720,18 @@ class BaseQorumAdapter(ABC):
             trigger_user_id=ctx.trigger_message.author.id,
         )
         self._quorum_sessions[plan_id] = quorum_state
+        # Mirror to DB so approval survives a bot restart
+        try:
+            save_qs = getattr(self._orchestrator, "save_quorum_session", None)
+            if save_qs:
+                await save_qs(
+                    plan_id=plan_id,
+                    channel_id=channel_id,
+                    trigger_user_id=ctx.trigger_message.author.id,
+                    quorum_config_json=quorum_cfg.model_dump_json() if hasattr(quorum_cfg, "model_dump_json") else "{}",
+                )
+        except Exception as exc:
+            log.debug("quorum_session.persist_skipped", plan_id=plan_id, error=str(exc))
 
         # Append audit event
         await self._orchestrator.append_audit_event(
@@ -561,6 +739,10 @@ class BaseQorumAdapter(ABC):
             actor=ctx.trigger_message.author.display_name,
             detail={"work_type": classification.work_type, "locate_mode": locate_result.mode},
         )
+
+        # Cache execution context so the Execute button can reconstruct the runner after approval
+        self._execution_context[plan_id] = (first_plan, locate_result, classification)
+        await self._persist_execution_context(plan_id, first_plan, locate_result, classification)
 
         # Post the approval card
         card_text = build_approval_card(plan_id, first_plan, intent, classification, locate_result, quorum_cfg)
@@ -574,6 +756,148 @@ class BaseQorumAdapter(ABC):
             plan_dir=str(locate_result.plan_dir),
         )
 
+    async def handle_clarification_reply(
+        self,
+        channel_id: str,
+        user_text: str,
+    ) -> None:
+        """
+        Called when the user replies to a pending clarifying question.
+        Appends the answer to the intent's context and re-runs classify → plan.
+        """
+        entry = self._pending_clarification.pop(channel_id, None)
+        if not entry:
+            return
+        intent, thread_id = entry
+
+        # Append the clarifying answer to the intent summary so the classifier
+        # has the full picture on the second pass.
+        if intent.summary:
+            intent.summary.context = (intent.summary.context or "") + f"\nClarification: {user_text}"
+
+        log.info("bot.clarification_received", channel_id=channel_id, text=user_text)
+
+        from qorum.collaboration.classifier import IntentClassifier, ClassificationError
+        from qorum.collaboration.locator import ProjectLocator
+        from qorum.collaboration.registry import ProjectRegistry
+        from qorum.core.plan_generator import QorumPlanGenerator, PlanGenerationError
+        from qorum.output.manager import QorumOutputManager
+        from qorum.approval.quorum import QuorumConfig, QuorumState, ApprovalVote, QuorumVerdict, evaluate
+        from qorum.approval.card import build_approval_card
+        from qorum.bot.buttons import approval_buttons
+
+        await self.send_message(channel_id, "_Classifying work type..._")
+
+        try:
+            classifier = IntentClassifier(self._config)
+            classification = await classifier.classify(intent)
+        except ClassificationError as exc:
+            log.error("bot.classify_failed_after_clarification", error=str(exc))
+            await self.send_message(channel_id, "[!] Classification failed. Please try again.")
+            return
+
+        if classification.needs_clarification:
+            # User already answered one clarifying question — force-proceed with
+            # a default classification rather than looping forever.
+            log.info("bot.clarification_forcing_proceed", channel_id=channel_id)
+            from qorum.collaboration.schemas import Classification as _Classification
+            classification = _Classification(
+                actionable=True,
+                work_type="feature",
+                complexity="SIMPLE",
+                model_tier="default",
+                reasoning="Forced proceed after clarification — classifier still uncertain.",
+            )
+
+        if classification.is_question_only:
+            await self.send_message(
+                channel_id,
+                f"_{intent.title_hint or 'Question'}_\n\n{intent.summary.context if intent.summary else ''}",
+            )
+            return
+
+        # ── Locate target project ─────────────────────────────────────────────
+        registry = ProjectRegistry(self._config.qorum_registry_path)
+        locator = ProjectLocator(registry, self._config)
+        locate_result = await locator.locate(intent, classification)
+
+        if locate_result.needs_human_input:
+            self._pending_after_map[channel_id] = (intent, classification, thread_id)
+            await self.send_message(
+                channel_id,
+                (locate_result.clarifying_question or "I need more information about the target repo.")
+                + "\nOnce mapped, I'll continue the plan automatically.",
+            )
+            return
+
+        if locate_result.plan_dir and intent.summary:
+            locate_result.plan_dir.mkdir(parents=True, exist_ok=True)
+            from qorum.collaboration.summarizer import ChatSummarizer
+            summarizer = ChatSummarizer(self._config)
+            await summarizer.persist(intent.capture, intent.summary, locate_result.plan_dir.parent)
+
+        await self.send_message(channel_id, "_Synthesising plan..._")
+
+        try:
+            generator = QorumPlanGenerator(self._config)
+            gen_result = await generator.generate_plan_from_intent(intent, classification)
+        except PlanGenerationError as exc:
+            log.error("bot.plan_gen_failed", error=str(exc))
+            await self.send_message(channel_id, f"[!] Plan generation failed: {str(exc)[:300]}")
+            return
+
+        plan_id = gen_result.ticket_id
+        output_mgr = QorumOutputManager(self._config)
+        await output_mgr.save_plans_to_dir(
+            plan_id=plan_id,
+            gen_result=gen_result,
+            plan_dir=locate_result.plan_dir,
+        )
+
+        quorum_cfg = QuorumConfig.from_plan_dir(locate_result.plan_dir) if locate_result.plan_dir else QuorumConfig()
+        first_plan = gen_result.plans[0].plan if gen_result.plans else None
+
+        if not first_plan:
+            await self.send_message(channel_id, "[!] No plan generated.")
+            return
+
+        quorum_state = QuorumState(
+            plan_id=plan_id,
+            config=quorum_cfg,
+            trigger_user_id=intent.author.id,
+        )
+        self._quorum_sessions[plan_id] = quorum_state
+        # Mirror to DB so approval survives a bot restart
+        try:
+            save_qs = getattr(self._orchestrator, "save_quorum_session", None)
+            if save_qs:
+                await save_qs(
+                    plan_id=plan_id,
+                    channel_id=channel_id,
+                    trigger_user_id=intent.author.id,
+                    quorum_config_json=quorum_cfg.model_dump_json() if hasattr(quorum_cfg, "model_dump_json") else "{}",
+                )
+        except Exception as exc:
+            log.debug("quorum_session.persist_skipped", plan_id=plan_id, error=str(exc))
+
+        await self._orchestrator.append_audit_event(
+            plan_id, "plan_created",
+            actor=intent.author.display_name,
+            detail={"work_type": classification.work_type, "locate_mode": locate_result.mode},
+        )
+
+        self._execution_context[plan_id] = (first_plan, locate_result, classification)
+        await self._persist_execution_context(plan_id, first_plan, locate_result, classification)
+
+        card_text = build_approval_card(plan_id, first_plan, intent, classification, locate_result, quorum_cfg)
+        await self.send_buttons(channel_id, card_text, approval_buttons(plan_id), thread_id=thread_id)
+
+        log.info(
+            "bot.approval_card_sent_after_clarification",
+            plan_id=plan_id,
+            work_type=classification.work_type,
+        )
+
     async def handle_boundary_adjust(
         self,
         channel_id: str,
@@ -583,6 +907,10 @@ class BaseQorumAdapter(ABC):
     ) -> None:
         """User clicked Trim or Expand — update the window and edit the card."""
         session = self._capture_sessions.get(capture_id)
+        if not session:
+            session = await self._restore_capture(capture_id)
+            if session:
+                self._capture_sessions[capture_id] = session
         if not session:
             await self.send_message(channel_id, "_Session expired. Please re-trigger @Qorum._")
             return
@@ -595,6 +923,7 @@ class BaseQorumAdapter(ABC):
             new_capture = await engine.expand_window(capture, self, steps=10)
 
         self._capture_sessions[capture_id] = (new_capture, ctx, engine)
+        await self._persist_capture(new_capture, ctx)
 
         from qorum.bot.buttons import boundary_buttons
         await self.edit_message(
@@ -662,8 +991,25 @@ class BaseQorumAdapter(ABC):
         """Handle [✅ Approve Plan] button press — evaluates quorum before proceeding."""
         from qorum.approval.quorum import ApprovalVote, QuorumVerdict, evaluate
 
-        # Phase 7: quorum vote path
+        # Phase 7: quorum vote path — restore from DB if not in memory (e.g. after restart)
         qs = self._quorum_sessions.get(ticket_id)
+        if qs is None:
+            try:
+                load_qs = getattr(self._orchestrator, "load_quorum_session", None)
+                if load_qs:
+                    rec = await load_qs(ticket_id)
+                    if rec:
+                        from qorum.approval.quorum import QuorumConfig, QuorumState
+                        restored_cfg = QuorumConfig.model_validate_json(rec.get("quorum_config") or "{}")
+                        qs = QuorumState(
+                            plan_id=ticket_id,
+                            config=restored_cfg,
+                            trigger_user_id=rec.get("trigger_user_id", ""),
+                        )
+                        self._quorum_sessions[ticket_id] = qs
+                        log.info("quorum_session.restored_from_db", plan_id=ticket_id)
+            except Exception as exc:
+                log.debug("quorum_session.restore_skipped", plan_id=ticket_id, error=str(exc))
         if qs is not None:
             vote = ApprovalVote(
                 user_id=ctx.user_id,
@@ -698,10 +1044,31 @@ class BaseQorumAdapter(ABC):
                 ticket_id, "approved", actor=ctx.username, detail={"rule": qs.config.rule}
             )
             del self._quorum_sessions[ticket_id]
+            try:
+                del_qs = getattr(self._orchestrator, "delete_quorum_session", None)
+                if del_qs:
+                    await del_qs(ticket_id)
+            except Exception:
+                pass
 
         ticket, generation_result = await self._load_session(ctx.channel_id, ticket_id)
-        if ticket is None or generation_result is None:
-            return  # _load_session already posted the error message
+        if not ticket:
+            # No ticket_sessions record = chat-based plan. Show execution control buttons.
+            cached = self._execution_context.get(ticket_id)
+            plan_dir = "qorum-workspace/.quorum/"
+            if cached:
+                _, locate, _ = cached
+                if locate and locate.plan_dir:
+                    plan_dir = str(locate.plan_dir)
+            from qorum.bot.buttons import execution_control_buttons
+            await self.send_buttons(
+                ctx.channel_id,
+                f"✅ *Plan `{ticket_id}` approved!*\n\n"
+                f"_Review the plan files at `{plan_dir}`, then click Execute when ready._\n"
+                f"_Or click Request Changes to describe what to adjust._",
+                execution_control_buttons(ticket_id),
+            )
+            return
 
         result = await self._orchestrator.approve(
             ticket, generation_result, approved_by=ctx.username
@@ -721,7 +1088,8 @@ class BaseQorumAdapter(ABC):
     ) -> None:
         """Handle [✏️ Request Changes] + collected feedback text. (B3: feedback threaded)"""
         ticket, _ = await self._load_session(ctx.channel_id, ticket_id)
-        if ticket is None:
+        if not ticket:
+            await self.send_message(ctx.channel_id, f"_Session expired. Run `/qorum refresh {ticket_id}`._")
             return
 
         await self._orchestrator.request_changes(ticket, feedback_text, actor=ctx.username)
@@ -770,7 +1138,8 @@ class BaseQorumAdapter(ABC):
         from qorum.output.renderer import PlanVsRealityDiff, TechnicalDecision, WalkthroughData
 
         ticket, _ = await self._load_session(ctx.channel_id, ticket_id)
-        if ticket is None:
+        if not ticket:
+            await self.send_message(ctx.channel_id, f"_Session expired. Run `/qorum refresh {ticket_id}`._")
             return
 
         walkthrough = WalkthroughData(
@@ -825,12 +1194,9 @@ class BaseQorumAdapter(ABC):
         # Slow path: DB
         row = await self._orchestrator.load_session(ticket_id)  # public API (B8)
         if not row:
-            await self.send_message(
-                channel_id,
-                f"Plan session for `{ticket_id}` has expired. "
-                f"Run `/qorum refresh {ticket_id}` to regenerate.",
-            )
-            return (None, None)
+            # Return sentinel (False, False) — caller checks for this to distinguish
+            # "genuinely expired board ticket" (sends error) from "chat plan" (sends success).
+            return (False, False)
 
         ticket = NormalizedTicket.from_json(row["ticket_json"])
         generation_result = GenerationResult.model_validate_json(row["result_json"])
@@ -960,11 +1326,11 @@ class BaseQorumAdapter(ABC):
                 f"Starting execution for `{plan_id}`...\n_Preparing branch..._",
             )
             # Future: reload plan from .quorum/ on disk. For now just report.
-            await self.send_message(channel_id, "⚠ Execution from plan_id only requires Phase 11 (board integration). Pass plan object directly from Phase 7.")
+            await self.send_message(channel_id, "[!] Execution from plan_id only requires Phase 11 (board integration). Pass plan object directly from Phase 7.")
             return
 
         if get_registry().is_active(plan_id):
-            await self.send_message(channel_id, f"⚠ `{plan_id}` is already executing. Use 🛑 Stop to halt it first.")
+            await self.send_message(channel_id, f"[!] `{plan_id}` is already executing. Use 🛑 Stop to halt it first.")
             return
 
         # Register the run with the visibility server so web/VS Code can see + target it.
@@ -1014,7 +1380,7 @@ class BaseQorumAdapter(ABC):
             await self.send_message(channel_id, f"🛑 Execution `{plan_id}` was force-stopped.")
         except Exception as exc:
             log.exception("bot.execution_error", plan_id=plan_id)
-            await self.send_message(channel_id, f"⚠ Execution failed: {exc}")
+            await self.send_message(channel_id, f"[!] Execution failed: {exc}")
         finally:
             self._active_executions.pop(plan_id, None)
             get_registry().remove(plan_id)
@@ -1029,7 +1395,7 @@ class BaseQorumAdapter(ABC):
         card_id = self._progress_cards.pop(plan_id, None)
 
         if not result.ok:
-            await self.send_message(channel_id, f"⚠ Execution failed: {result.error}")
+            await self.send_message(channel_id, f"[!] Execution failed: {result.error}")
             return
 
         card = result.diff_card_text()
@@ -1151,10 +1517,23 @@ class BaseQorumAdapter(ABC):
 
         try:
             sha = await runner.commit_result(result)
+            rp = result.rollback_point
+            stash_note = ""
+            if rp and rp.stash_ref:
+                stash_note = (
+                    f"\n\n_Your stash `{rp.stash_ref}` is waiting on `{rp.base_branch}` — "
+                    f"run `git stash pop` there when ready._"
+                )
+            branch = getattr(runner, "_commit_branch", result.branch)
+            is_remote = await _check_has_remote(runner)
+            remote_note = (
+                "_No push — use `git push` or open a PR when ready._"
+                if is_remote
+                else "_Local repo — no remote configured._"
+            )
             await self.send_message(
                 channel_id,
-                f"✅ Committed! SHA `{sha[:8]}` on `{result.branch}`\n\n"
-                f"_No push — use `git push` or open a PR when ready._",
+                f"✅ Committed `{sha[:8]}` on branch `{branch}`\n{remote_note}{stash_note}",
             )
             await self._orchestrator.append_audit_event(
                 plan_id, "committed", detail={"sha": sha, "branch": result.branch}
@@ -1171,7 +1550,7 @@ class BaseQorumAdapter(ABC):
                 )
                 self._execution_results[plan_id] = session
             else:
-                await self.send_message(channel_id, f"⚠ Commit failed: {exc}")
+                await self.send_message(channel_id, f"[!] Commit failed: {exc}")
 
     async def handle_discard_diff(
         self,
@@ -1201,7 +1580,7 @@ class BaseQorumAdapter(ABC):
         except Exception as exc:
             await self.send_message(
                 channel_id,
-                f"⚠ Discard failed: {exc}\n_Branch `{result.branch}` may still exist — inspect manually._",
+                f"[!] Discard failed: {exc}\n_Branch `{result.branch}` may still exist — inspect manually._",
             )
 
     async def _handle_map(self, ctx: BotContext, repo_path: str) -> None:
@@ -1226,6 +1605,89 @@ class BaseQorumAdapter(ABC):
             f"✅ This channel is now mapped to `{p}`.\n"
             f"Plans will be written to `{p / '.quorum'}`.",
         )
+
+        # Resume pending plan flow if one was waiting for this mapping
+        pending = self._pending_after_map.pop(ctx.channel_id, None)
+        if pending:
+            intent, classification, thread_id = pending
+            asyncio.create_task(
+                self._resume_plan_after_map(ctx.channel_id, intent, classification, thread_id)
+            )
+
+    async def _resume_plan_after_map(
+        self,
+        channel_id: str,
+        intent: Any,
+        classification: Any,
+        thread_id: Any,
+    ) -> None:
+        """Re-run locate → plan → approval card after the user mapped the channel."""
+        from qorum.collaboration.locator import ProjectLocator
+        from qorum.collaboration.registry import ProjectRegistry
+        from qorum.core.plan_generator import QorumPlanGenerator, PlanGenerationError
+        from qorum.output.manager import QorumOutputManager
+        from qorum.approval.quorum import QuorumConfig, QuorumState
+        from qorum.approval.card import build_approval_card
+        from qorum.bot.buttons import approval_buttons
+
+        await self.send_message(channel_id, "_Resuming plan generation..._")
+
+        registry = ProjectRegistry(self._config.qorum_registry_path)
+        locator = ProjectLocator(registry, self._config)
+        locate_result = await locator.locate(intent, classification)
+
+        if locate_result.needs_human_input:
+            await self.send_message(channel_id, "[!] Still can't locate the repo. Please check the mapping and try `/qorum plan` again.")
+            return
+
+        if locate_result.plan_dir and intent.summary:
+            locate_result.plan_dir.mkdir(parents=True, exist_ok=True)
+            from qorum.collaboration.summarizer import ChatSummarizer
+            summarizer = ChatSummarizer(self._config)
+            await summarizer.persist(intent.capture, intent.summary, locate_result.plan_dir.parent)
+
+        await self.send_message(channel_id, "_Synthesising plan..._")
+
+        try:
+            generator = QorumPlanGenerator(self._config)
+            gen_result = await generator.generate_plan_from_intent(intent, classification)
+        except PlanGenerationError as exc:
+            log.error("bot.plan_gen_failed", error=str(exc))
+            await self.send_message(channel_id, f"[!] Plan generation failed: {str(exc)[:300]}")
+            return
+
+        plan_id = gen_result.ticket_id
+        output_mgr = QorumOutputManager(self._config)
+        await output_mgr.save_plans_to_dir(plan_id=plan_id, gen_result=gen_result, plan_dir=locate_result.plan_dir)
+
+        quorum_cfg = QuorumConfig.from_plan_dir(locate_result.plan_dir) if locate_result.plan_dir else QuorumConfig()
+        first_plan = gen_result.plans[0].plan if gen_result.plans else None
+
+        if not first_plan:
+            await self.send_message(channel_id, "[!] No plan generated.")
+            return
+
+        quorum_state = QuorumState(plan_id=plan_id, config=quorum_cfg, trigger_user_id=intent.author.id)
+        self._quorum_sessions[plan_id] = quorum_state
+        try:
+            save_qs = getattr(self._orchestrator, "save_quorum_session", None)
+            if save_qs:
+                await save_qs(plan_id=plan_id, channel_id=channel_id, trigger_user_id=intent.author.id,
+                              quorum_config_json=quorum_cfg.model_dump_json() if hasattr(quorum_cfg, "model_dump_json") else "{}")
+        except Exception as exc:
+            log.debug("quorum_session.persist_skipped", plan_id=plan_id, error=str(exc))
+
+        await self._orchestrator.append_audit_event(plan_id, "plan_created",
+            actor=intent.author.display_name,
+            detail={"work_type": classification.work_type, "locate_mode": locate_result.mode})
+
+        self._execution_context[plan_id] = (first_plan, locate_result, classification)
+        await self._persist_execution_context(plan_id, first_plan, locate_result, classification)
+
+        card_text = build_approval_card(plan_id, first_plan, intent, classification, locate_result, quorum_cfg)
+        await self.send_buttons(channel_id, card_text, approval_buttons(plan_id), thread_id=thread_id)
+
+        log.info("bot.approval_card_sent_after_map", plan_id=plan_id, work_type=classification.work_type)
 
     async def _handle_where(self, ctx: BotContext) -> None:
         from qorum.collaboration.registry import ProjectRegistry

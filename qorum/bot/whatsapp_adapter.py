@@ -143,6 +143,12 @@ class WhatsAppAdapter(BaseQorumAdapter):
 
         # Numbered reply fallback
         text = msg.get("text", {}).get("body", "").strip() if msg_type == "text" else ""
+
+        # Clarification reply — resume plan flow with the user's answer
+        if text and channel_id in self._pending_clarification:
+            asyncio.create_task(self.handle_clarification_reply(channel_id, text))
+            return
+
         pending_buttons = self._pending_buttons.get(from_phone)
         if pending_buttons and text.isdigit():
             result = parse_numbered_reply(text, pending_buttons)

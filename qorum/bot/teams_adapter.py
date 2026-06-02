@@ -156,6 +156,13 @@ class TeamsAdapter(BaseQorumAdapter):
 
         text = (activity.text or "").strip()
         bot_id = self._settings.app_id or ""
+        conv = getattr(activity, "conversation", None)
+        channel_id = getattr(conv, "id", "") if conv else ""
+
+        # Clarification reply — resume plan flow with the user's answer
+        if text and channel_id in self._pending_clarification:
+            asyncio.create_task(self.handle_clarification_reply(channel_id, text))
+            return
 
         # Check if this is a @mention of the bot
         is_mention = any(

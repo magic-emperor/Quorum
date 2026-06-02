@@ -22,6 +22,19 @@ def configure_logging(log_level: str = "INFO") -> None:
     """
     level = getattr(logging, log_level.upper(), logging.INFO)
 
+    # Force UTF-8 on stdout/stderr so Unicode characters (emojis, special symbols)
+    # don't crash on Windows where the default console codepage is CP1252.
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    if hasattr(sys.stderr, "reconfigure"):
+        try:
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     # Configure stdlib logging (used by third-party libs)
     logging.basicConfig(
         format="%(message)s",
