@@ -2,7 +2,7 @@
 name: coder
 description: Implements plan sub-tasks by editing and creating files in the repo.
 model_role: execute
-allowed_tools: [read_file, write_file, edit_file, glob, list_dir, grep, find_symbol, run_command, git_add]
+allowed_tools: [read_file, write_file, edit_file, glob, list_dir, grep, find_symbol, web_search, run_command, git_add]
 max_steps: 40
 max_tokens_total: 200000
 ---

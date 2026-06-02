@@ -2,7 +2,7 @@
 name: planner
 description: Reads the codebase context and emits a structured plan. No file writes.
 model_role: plan
-allowed_tools: [read_file, glob, grep, find_symbol, list_dir]
+allowed_tools: [read_file, glob, grep, find_symbol, list_dir, web_search]
 max_steps: 15
 max_tokens_total: 80000
 ---
