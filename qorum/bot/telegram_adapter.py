@@ -176,12 +176,19 @@ class TelegramAdapter(BaseQorumAdapter):
             "reply_markup": keyboard,
         }
         if thread_id:
-            # Telegram uses message_thread_id for supergroup forum threads
             try:
                 kwargs["message_thread_id"] = int(thread_id)
             except (ValueError, TypeError):
                 pass
-        msg = await self._app.bot.send_message(**kwargs)
+        try:
+            msg = await self._app.bot.send_message(**kwargs)
+        except Exception as exc:
+            if "thread" in str(exc).lower() or "message_thread_id" in str(exc).lower():
+                # Private chats and non-forum groups don't support threads — retry without it
+                kwargs.pop("message_thread_id", None)
+                msg = await self._app.bot.send_message(**kwargs)
+            else:
+                raise
         return str(msg.message_id)
 
     async def edit_message(
