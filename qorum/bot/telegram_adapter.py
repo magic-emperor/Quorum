@@ -114,7 +114,9 @@ class TelegramAdapter(BaseQorumAdapter):
         await self._app.initialize()
         await self._app.start()
         await self.on_mention(self.handle_mention)
-        await self._app.updater.start_polling()
+        # drop_pending_updates=True discards old button callbacks from previous sessions
+        # so they don't immediately trigger "Session expired" after a restart
+        await self._app.updater.start_polling(drop_pending_updates=True)
         # Block here until stop() sets the event
         await self._stop_event.wait()
 
