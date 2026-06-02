@@ -132,6 +132,52 @@ async def azure_webhook(request: Request) -> dict:
     return {"received": True, "ticket": ticket_id, "event": event_type}
 
 
+# ── GitHub Issues ────────────────────────────────────────────────────────────
+
+@router.post("/github")
+async def github_webhook(request: Request) -> dict:
+    """
+    GitHub Issues webhook endpoint.
+    Verifies X-Hub-Signature-256 when GITHUB_WEBHOOK_SECRET is set.
+    Handles: issues.opened, issues.edited, issue_comment.created
+    """
+    body = await request.body()
+    secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+
+    if secret:
+        sig_header = request.headers.get("X-Hub-Signature-256", "")
+        if not _verify_hmac(body, secret, sig_header):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
+
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON")
+
+    event_name = request.headers.get("X-GitHub-Event", "")
+    action = payload.get("action", "")
+    issue = payload.get("issue", {})
+    repo = payload.get("repository", {})
+    ticket_id = f"{repo.get('full_name', '')}#{issue.get('number', '')}"
+    event_type = f"{event_name}.{action}"
+
+    log.info("webhook.github", event_type=event_type, ticket=ticket_id)
+
+    if ticket_id and ticket_id != "#":
+        get_bus().publish(f"watch-{ticket_id}", ToolEvent(
+            kind="status", agent="webhook",
+            summary=f"GitHub webhook: {event_type} on {ticket_id}",
+        ))
+
+    for cb in _watchers.get("github", []):
+        try:
+            await cb(ticket_id, event_type, payload)
+        except Exception as exc:
+            log.error("webhook.github_handler_failed", ticket=ticket_id, error=str(exc))
+
+    return {"received": True, "ticket": ticket_id, "event": event_type}
+
+
 # ── WhatsApp Cloud API ────────────────────────────────────────────────────────
 
 _whatsapp_adapter = None

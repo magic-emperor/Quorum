@@ -136,3 +136,59 @@ class FindSymbolTool(QorumTool):
                           payload={"symbol": symbol})
         ctx.emit(event)
         return ToolResult.success(output or f"Symbol '{symbol}' not found.", event=event)
+
+
+class WebSearchTool(QorumTool):
+    """
+    Injected when the AI provider lacks native web search (e.g. Groq, DeepSeek, Mistral).
+    Uses DuckDuckGo Instant Answer API — no API key required.
+    """
+
+    @property
+    def spec(self) -> ToolSpec:
+        return ToolSpec(
+            name="web_search",
+            description=(
+                "Search the web for current information. Use when you need facts, "
+                "documentation, or context not available in the codebase."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"},
+                },
+                "required": ["query"],
+            },
+        )
+
+    async def run(self, args: dict[str, Any], ctx: ToolContext) -> ToolResult:
+        import urllib.parse
+        query = args.get("query", "").strip()
+        if not query:
+            return ToolResult.failure("query is required")
+
+        encoded = urllib.parse.quote_plus(query)
+        url = f"https://api.duckduckgo.com/?q={encoded}&format=json&no_html=1&skip_disambig=1"
+
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    data = await resp.json(content_type=None)
+
+            results: list[str] = []
+            if data.get("AbstractText"):
+                results.append(data["AbstractText"])
+            for item in data.get("RelatedTopics", [])[:5]:
+                if isinstance(item, dict) and item.get("Text"):
+                    results.append(item["Text"])
+
+            output = "\n\n".join(results) if results else "No results found."
+        except Exception as exc:
+            output = f"Web search failed: {exc}"
+
+        event = ToolEvent(kind="search", agent=ctx.agent,
+                          summary=f"web_search '{query}'",
+                          payload={"query": query})
+        ctx.emit(event)
+        return ToolResult.success(output, event=event)

@@ -30,12 +30,16 @@ class AnthropicProvider(LLMProvider):
         m = model.lower()
         # Claude 3+ all support tool use
         if "claude" in m:
+            # claude-3-7+ / claude-sonnet-4+ have extended thinking
+            has_thinking = any(x in m for x in ("3-7", "3.7", "sonnet-4", "opus-4", "haiku-4"))
             return Capabilities(
                 native_tool_use=True,
-                json_mode=False,       # Claude uses prompt-enforced JSON
+                json_mode=False,
                 max_output_tokens=8192,
                 supports_system=True,
                 context_window=200_000,
+                native_web_search=True,   # Claude supports web_search tool natively
+                native_thinking=has_thinking,
             )
         return Capabilities()
 

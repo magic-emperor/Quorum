@@ -2,9 +2,14 @@
 Qorum — Application Entry Point
 
 Usage:
-    python main.py                  # Start all configured bots
-    python main.py --platform slack # Start Slack bot only
-    python main.py --test-url <url> # Test URL detection + context fetch (no bot)
+    qorum                           # Start all configured bots
+    qorum --teams                   # Start Teams only
+    qorum --slack                   # Start Slack only
+    qorum --telegram --discord      # Start two platforms at once
+    qorum bot --platform teams      # Long-form alias (same result)
+    qorum serve                     # Start visibility server + web dashboard
+    qorum watch --tool jira --project KEY
+    qorum test-url <url>
 """
 from __future__ import annotations
 
@@ -51,6 +56,8 @@ def parse_args() -> argparse.Namespace:
     watch_p.add_argument("--project", required=True, help="Project key or owner/repo")
     watch_p.add_argument("--keyword", default="[QORUM]", help="Keyword to watch for (default: [QORUM])")
     watch_p.add_argument("--poll", type=int, default=60, metavar="SECONDS")
+    watch_p.add_argument("--register-webhook", metavar="URL",
+                         help="Register a webhook at the given public URL instead of polling")
     watch_p.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default=None)
 
     # ── qorum doctor ─────────────────────────────────────────────────────────
@@ -61,14 +68,14 @@ def parse_args() -> argparse.Namespace:
     url_p.add_argument("url", help="Full ticket URL to test")
     url_p.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default=None)
 
-    # ── Short platform flags: qorum --telegram, qorum --teams --discord ───────
+    # ── Short-form platform flags: qorum --teams, qorum --slack --discord ───────
     parser.add_argument("--teams",     action="store_true", help="Start Teams bot")
     parser.add_argument("--slack",     action="store_true", help="Start Slack bot")
     parser.add_argument("--discord",   action="store_true", help="Start Discord bot")
     parser.add_argument("--telegram",  action="store_true", help="Start Telegram bot")
     parser.add_argument("--whatsapp",  action="store_true", help="Start WhatsApp bot")
 
-    # ── Legacy top-level flags ────────────────────────────────────────────────
+    # ── Legacy top-level flags (backward compat) ──────────────────────────────
     parser.add_argument(
         "--platform",
         choices=["slack", "discord", "telegram", "all"],
@@ -95,6 +102,24 @@ async def _start_watch(args) -> None:
         "github": lambda: __import__("qorum.adapters.github_issues", fromlist=["GitHubIssuesAdapter"]).GitHubIssuesAdapter(settings),
     }
     adapter = tool_adapters[args.tool]()
+
+    # --register-webhook: one-shot webhook registration then exit
+    webhook_url = getattr(args, "register_webhook", None)
+    if webhook_url:
+        import os
+        if args.tool == "jira":
+            secret = os.environ.get("JIRA_WEBHOOK_SECRET", "")
+            result = await adapter.register_webhook(webhook_url, secret)
+            print(f"Jira webhook registered: {result.get('self', result)}")
+        elif args.tool == "github":
+            owner, repo = args.project.split("/", 1)
+            secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+            result = await adapter.register_webhook(owner, repo, webhook_url, secret)
+            print(f"GitHub webhook registered: id={result.get('id')}, url={webhook_url}")
+        else:
+            print(f"Webhook registration not supported for {args.tool} via CLI.")
+        return
+
     runner = WatchRunner(
         adapter=adapter,
         config=settings,
@@ -128,7 +153,8 @@ async def test_url(url: str) -> None:
 
 
 def _build_bots(platform: str, orchestrator) -> list:
-    """Instantiate all configured bot adapters for the requested platform(s)."""
+    """Instantiate configured bot adapters. platform can be a single name,
+    'all', or a comma-separated list e.g. 'teams,discord'."""
     from qorum.config import settings
     from qorum.bot.slack_adapter import SlackAdapter
     from qorum.bot.discord_adapter import DiscordAdapter
